@@ -1,0 +1,13 @@
+.cache/
+bin/
+build/
+compile_commands.json
+**.obj
+**.exe
+**.exe.old
+**.exp
+**.lib
+**.so
+nob
+nob.old
+debug.keystore
