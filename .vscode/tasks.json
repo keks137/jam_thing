@@ -7,15 +7,14 @@
             "label": "build debug",
             "type": "process",
             "command": "build",
-            "args": [
-                "PLATFORM=PLATFORM_DESKTOP",
-                "BUILD_MODE=DEBUG",
-                "PROJECT_NAME=cool_project",
-                "OBJS=cool_project.c"
-            ],
+            "args": [],
             "windows": {
                 "command": "build.bat",
                 "args": [ ],
+            },
+	    "osx": {
+                "command": "./build.sh",
+                "args": [],
             },
             "group": {
                 "kind": "build",
