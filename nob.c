@@ -67,6 +67,60 @@ bool build_raylib_linux(Nob_Cmd *cmd)
 
 	return true;
 }
+
+bool build_raylib_macos(Nob_Cmd *cmd)
+{
+	Nob_File_Paths object_files = { 0 };
+	Nob_Procs procs = { 0 };
+	char *build_path = BUILD_DIR "raylib_macos/";
+	if (!nob_mkdir_if_not_exists(build_path))
+		return false;
+
+	for (size_t i = 0; i < NOB_ARRAY_LEN(rayfiles); ++i) {
+		const char *input_path =
+			nob_temp_sprintf(RSOURCE "%s.c", rayfiles[i]);
+		const char *output_path =
+			nob_temp_sprintf("%s%s.o", build_path, rayfiles[i]);
+
+		nob_da_append(&object_files, output_path);
+
+		if (nob_needs_rebuild(output_path, &input_path, 1)) {
+			nob_cmd_append(cmd, "cc");
+			nob_cmd_append(cmd, "-std=c99");
+			nob_cmd_append(cmd, "-g");
+			nob_cmd_append(cmd, "-O2");
+			nob_cmd_append(cmd, "-DPLATFORM_DESKTOP");
+			nob_cmd_append(cmd, "-D_GLFW_COCOA");
+			nob_cmd_append(cmd, "-I./raylib/src/");
+			nob_cmd_append(cmd, GLFWIN);
+			nob_cmd_append(cmd, "-c");
+			nob_cmd_append(cmd, input_path);
+			nob_cmd_append(cmd, "-o");
+			nob_cmd_append(cmd, output_path);
+			if (!nob_cmd_run(cmd, .async = &procs))
+				return false;
+		}
+	}
+
+	nob_temp_reset();
+	if (!nob_procs_wait(procs))
+		return false;
+
+	cmd_append(cmd, "ar");
+	cmd_append(cmd, "-crs");
+	cmd_append(cmd, BUILD_DIR "raylib_macos/libraylib.a");
+	for (int i = 0; i < NOB_ARRAY_LEN(rayfiles); i++) {
+		const char *objfile = nob_temp_sprintf(
+			"%s%s.o", BUILD_DIR "raylib_macos/", rayfiles[i]);
+		nob_cmd_append(cmd, objfile);
+	}
+	nob_temp_reset();
+	if (!nob_cmd_run(cmd))
+		return false;
+
+	return true;
+}
+
 bool build_raylib_web(Nob_Cmd *cmd)
 {
 	Nob_File_Paths object_files = { 0 };
@@ -135,8 +189,8 @@ bool build_raylib_msvc(Nob_Cmd *cmd)
 	for (size_t i = 0; i < NOB_ARRAY_LEN(rayfiles); ++i) {
 		const char *input_path =
 			nob_temp_sprintf(RSOURCE "%s.c", rayfiles[i]);
-		const char *output_path = nob_temp_sprintf(
-			"%s%s.obj", build_path, rayfiles[i]);
+		const char *output_path =
+			nob_temp_sprintf("%s%s.obj", build_path, rayfiles[i]);
 
 		nob_da_append(&object_files, output_path);
 
@@ -203,6 +257,36 @@ bool build_linux(Nob_Cmd *cmd)
 
 	nob_cmd_append(cmd, "-lm");
 	nob_cmd_append(cmd, "-lX11");
+
+	if (!nob_cmd_run(cmd))
+		return false;
+
+	return true;
+}
+
+bool build_macos(Nob_Cmd *cmd)
+{
+	if (!nob_file_exists(BUILD_DIR "raylib_macos/libraylib.a")) {
+		if (!build_raylib_macos(cmd))
+			return false;
+	}
+	nob_cmd_append(cmd, "cc");
+	nob_cmd_append(cmd, "-std=c99");
+	nob_cmd_append(cmd, "-g");
+	nob_cmd_append(cmd, "-O2");
+	nob_cmd_append(cmd, "-DPLATFORM_DESKTOP");
+	nob_cmd_append(cmd, SRC_DIR "unity.c");
+	nob_cmd_append(cmd, "-o");
+	nob_cmd_append(cmd, BIN_DIR GAME_NAME);
+	nob_cmd_append(cmd, "-I./" RSOURCE);
+	cmd_append(cmd, "-Ivendor");
+	nob_cmd_append(cmd, BUILD_DIR "raylib_macos/libraylib.a");
+
+	nob_cmd_append(cmd, "-framework", "CoreVideo");
+	nob_cmd_append(cmd, "-framework", "IOKit");
+	nob_cmd_append(cmd, "-framework", "Cocoa");
+	nob_cmd_append(cmd, "-framework", "GLUT");
+	nob_cmd_append(cmd, "-framework", "OpenGL");
 
 	if (!nob_cmd_run(cmd))
 		return false;
@@ -279,6 +363,9 @@ bool build()
 	Nob_Cmd cmd = { 0 };
 #ifdef _MSC_VER
 	if (!build_msvc(&cmd))
+		return false;
+#elif defined(__APPLE__)
+	if (!build_macos(&cmd))
 		return false;
 #else
 	if (web) {
