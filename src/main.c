@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include <math.h>
 #include <stddef.h>
 #include "vassert.h"
 #include <string.h>
@@ -51,12 +52,26 @@ void draw_pizza(const Pizza *p)
 {
 	float sw = gs.pizza_texture.width * gs.pizza_texture_scale;
 	float sh = gs.pizza_texture.height * gs.pizza_texture_scale;
+	float radius = sh / 2;
 
 	Rectangle source = { 0, 0, gs.pizza_texture.width, gs.pizza_texture.height };
 	Rectangle dest = { p->pos.x, p->pos.y, sw, sh };
 	Vector2 origin = { sw / 2.0f, sh / 2.0f };
 
 	DrawTexturePro(gs.pizza_texture, source, dest, origin, p->rotation, WHITE);
+
+	float slice_step = 360.0 / p->slices_count;
+	for (float i = 0; i < p->slices_count; i++) {
+		DrawText(TextFormat("%f", slice_step), 0, 0, 20, GREEN);
+		float a = (i*slice_step + p->rotation) * DEG2RAD;
+
+		Vector2 end = {
+			p->pos.x + cosf(a) * radius,
+			p->pos.y + sinf(a) * radius
+		};
+
+		DrawLineEx(p->pos, end, 3, BLACK);
+	}
 }
 void UpdateDrawFrame(void)
 {
@@ -74,12 +89,12 @@ void UpdateDrawFrame(void)
 }
 int main()
 {
-	gs.screen_width = 800;
-	gs.screen_height = 450;
+	gs.screen_width = 1920;
+	gs.screen_height = 1080;
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(gs.screen_width, gs.screen_height, "raylib - project_name");
 	gs.pizza_texture = LoadTexture("assets/Pizza.PNG");
-	gs.pizza_texture_scale = 0.20;
+	gs.pizza_texture_scale = 0.40;
 
 	size_t pizza_index = get_pizza();
 	{
@@ -87,6 +102,7 @@ int main()
 		p->pos = (Vector2){ gs.screen_width / 2.0,
 				    gs.screen_height / 2.0 };
 		p->rot_speed = 1.0;
+		p->slices_count = 6;
 	}
 #if defined(PLATFORM_WEB)
 	emscripten_set_main_loop(UpdateDrawFrame, 60, 1);
