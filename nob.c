@@ -311,9 +311,13 @@ bool build_web(Nob_Cmd *cmd)
 	cmd_append(cmd, "--shell-file");
 	cmd_append(cmd, SRC_DIR "shell.html");
 	cmd_append(cmd, BUILD_DIR "raylib_web/libraylib.a");
+	cmd_append(cmd, "--preload-file");
+	cmd_append(cmd, "assets");
 	cmd_append(cmd, "-I" RSOURCE);
 	cmd_append(cmd, "-I" SRC_DIR);
 	cmd_append(cmd, "-Ivendor");
+	cmd_append(cmd, "-s", "MAXIMUM_MEMORY=2GB");
+	cmd_append(cmd, "-s", "ALLOW_MEMORY_GROWTH=1");
 	cmd_append(cmd, "-s", "USE_GLFW=3");
 #ifdef ASYNCIFY
 	cmd_append(cmd, "-s");

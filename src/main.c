@@ -1,83 +1,100 @@
 #include "raylib.h"
+#include <stddef.h>
+#include "vassert.h"
+#include <string.h>
 
 #if defined(PLATFORM_WEB)
 #include <emscripten/emscripten.h>
 #endif
 
-//----------------------------------------------------------------------------------
-// Global Variables Definition (local to this module)
-//----------------------------------------------------------------------------------
-Camera camera = { 0 };
-Vector3 cubePosition = { 0 };
+typedef enum {
+	Mushroom,
+	Pepperoni,
 
-//----------------------------------------------------------------------------------
-// Module Functions Declaration
-//----------------------------------------------------------------------------------
-static void UpdateDrawFrame(void); // Update and draw one frame
+} IngredientKind;
+#define MAX_INGREDIENTS 32
+#define MAX_PIZZAS 12
+#define MAX_SLICES 32
+typedef struct {
+	IngredientKind kind;
+	Vector2 pos; // NOTE: offset from center of non-rotated pizza
+} Ingredient;
+typedef struct {
+	Ingredient ingredients[MAX_INGREDIENTS];
+} Slice;
+typedef struct {
+	Slice slices[MAX_SLICES];
+	Vector2 pos;
+	size_t slices_count;
+	float rotation;
+	float rot_speed;
+} Pizza;
+typedef struct {
+	Pizza pizzas[MAX_PIZZAS];
+	size_t pizza_count;
+	Texture pizza_texture;
+	float pizza_texture_scale;
+	int screen_width;
+	int screen_height;
+} GameState;
 
-//----------------------------------------------------------------------------------
-// Program main entry point
-//----------------------------------------------------------------------------------
+GameState gs;
+
+size_t get_pizza()
+{
+	VENSURE(gs.pizza_count < MAX_PIZZAS);
+	size_t index = gs.pizza_count;
+	gs.pizza_count++;
+	return index;
+}
+void draw_pizza(const Pizza *p)
+{
+	float sw = gs.pizza_texture.width * gs.pizza_texture_scale;
+	float sh = gs.pizza_texture.height * gs.pizza_texture_scale;
+
+	Rectangle source = { 0, 0, gs.pizza_texture.width, gs.pizza_texture.height };
+	Rectangle dest = { p->pos.x, p->pos.y, sw, sh };
+	Vector2 origin = { sw / 2.0f, sh / 2.0f };
+
+	DrawTexturePro(gs.pizza_texture, source, dest, origin, p->rotation, WHITE);
+}
+void UpdateDrawFrame(void)
+{
+	float delta = GetFrameTime();
+
+	BeginDrawing();
+	ClearBackground(RAYWHITE);
+	for (size_t i = 0; i < gs.pizza_count; i++) {
+		Pizza *p = &gs.pizzas[i];
+		p->rotation += delta * 10 * p->rot_speed;
+		draw_pizza(p);
+	}
+	// DrawFPS(10, 10);
+	EndDrawing();
+}
 int main()
 {
-	// Initialization
-	//--------------------------------------------------------------------------------------
-	const int screenWidth = 800;
-	const int screenHeight = 450;
+	gs.screen_width = 800;
+	gs.screen_height = 450;
+	SetConfigFlags(FLAG_VSYNC_HINT);
+	InitWindow(gs.screen_width, gs.screen_height, "raylib - project_name");
+	gs.pizza_texture = LoadTexture("assets/Pizza.PNG");
+	gs.pizza_texture_scale = 0.20;
 
-	InitWindow(screenWidth, screenHeight, "raylib - project_name");
-
-	camera.position = (Vector3){ 3.0f, 3.0f, 2.0f };
-	camera.target = (Vector3){ 0.0f, 0.0f, 0.0f };
-	camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
-	camera.fovy = 90.0f;
-	camera.projection = CAMERA_PERSPECTIVE;
-
+	size_t pizza_index = get_pizza();
+	{
+		Pizza *p = &gs.pizzas[pizza_index];
+		p->pos = (Vector2){ gs.screen_width / 2.0,
+				    gs.screen_height / 2.0 };
+		p->rot_speed = 1.0;
+	}
 #if defined(PLATFORM_WEB)
 	emscripten_set_main_loop(UpdateDrawFrame, 60, 1);
 #else
-	SetTargetFPS(60); // Set our game to run at 60 frames-per-second
-	//--------------------------------------------------------------------------------------
-
-	// Main game loop
-	while (!WindowShouldClose()) // Detect window close button or ESC key
+	// SetTargetFPS(60); // Set our game to run at 60 frames-per-second
+	while (!WindowShouldClose())
 		UpdateDrawFrame();
 #endif
-
-	// De-Initialization
-	//--------------------------------------------------------------------------------------
-	CloseWindow(); // Close window and OpenGL context
-	//--------------------------------------------------------------------------------------
-
+	CloseWindow();
 	return 0;
-}
-
-// Update and draw game frame
-static void UpdateDrawFrame(void)
-{
-	// Update
-	//----------------------------------------------------------------------------------
-	UpdateCamera(&camera, CAMERA_ORBITAL);
-	//----------------------------------------------------------------------------------
-
-	// Draw
-	//----------------------------------------------------------------------------------
-	BeginDrawing();
-
-	ClearBackground(RAYWHITE);
-
-	BeginMode3D(camera);
-
-	DrawCube(cubePosition, 2.0f, 2.0f, 2.0f, RED);
-	DrawCubeWires(cubePosition, 2.0f, 2.0f, 2.0f, MAROON);
-	DrawGrid(10, 1.0f);
-
-	EndMode3D();
-
-	DrawText("Welcome to raylib basic sample", 10, 40, 20, DARKGRAY);
-
-	DrawFPS(10, 10);
-
-	EndDrawing();
-	//----------------------------------------------------------------------------------
 }
