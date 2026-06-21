@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stddef.h>
 #include "vassert.h"
+#include <stdio.h>
 #include <string.h>
 
 #if defined(PLATFORM_WEB)
@@ -22,6 +23,7 @@ typedef struct {
 } Ingredient;
 typedef struct {
 	Ingredient ingredients[MAX_INGREDIENTS];
+	size_t ingredients_count;
 } Slice;
 typedef struct {
 	Slice slices[MAX_SLICES];
@@ -34,7 +36,9 @@ typedef struct {
 	Pizza pizzas[MAX_PIZZAS];
 	size_t pizza_count;
 	Texture pizza_texture;
+	Texture pepperoni_texture;
 	float pizza_texture_scale;
+	float pepperoni_texture_scale;
 	int screen_width;
 	int screen_height;
 } GameState;
@@ -48,7 +52,17 @@ size_t get_pizza()
 	gs.pizza_count++;
 	return index;
 }
-void draw_pizza(const Pizza *p)
+
+size_t current_slice(const Pizza *p)
+{
+	float slice_step = 360.0 / p->slices_count;
+	size_t index = p->rotation / slice_step;
+	return index;
+}
+void draw_ingredients(Pizza *p)
+{
+}
+void draw_pizza(Pizza *p)
 {
 	float sw = gs.pizza_texture.width * gs.pizza_texture_scale;
 	float sh = gs.pizza_texture.height * gs.pizza_texture_scale;
@@ -61,16 +75,26 @@ void draw_pizza(const Pizza *p)
 	DrawTexturePro(gs.pizza_texture, source, dest, origin, p->rotation, WHITE);
 
 	float slice_step = 360.0 / p->slices_count;
-	for (float i = 0; i < p->slices_count; i++) {
-		DrawText(TextFormat("%f", slice_step), 0, 0, 20, GREEN);
-		float a = (i*slice_step + p->rotation) * DEG2RAD;
+	for (size_t i = 0; i < p->slices_count; i++) {
+		float a = (i * slice_step + p->rotation) * DEG2RAD;
 
 		Vector2 end = {
-			p->pos.x + cosf(a) * radius,
-			p->pos.y + sinf(a) * radius
+			p->pos.x + sinf(a) * radius,
+			p->pos.y - cosf(a) * radius
 		};
 
 		DrawLineEx(p->pos, end, 3, BLACK);
+	}
+	for (size_t i = 0; i < p->slices_count; i++) {
+		Slice *s = &p->slices[i];
+		for (size_t i = 0; i < s->ingredients_count; i++) {
+			float sw = gs.pepperoni_texture.width * gs.pepperoni_texture_scale;
+			float sh = gs.pepperoni_texture.height * gs.pepperoni_texture_scale;
+			Rectangle source = { 0, 0, gs.pepperoni_texture.width, gs.pepperoni_texture.height };
+			Rectangle dest = { p->pos.x, p->pos.y, sw, sh };
+			Vector2 origin = { sw / 2.0f, sh / 2.0f };
+			DrawTexturePro(gs.pepperoni_texture, source, dest, origin, p->rotation, WHITE);
+		}
 	}
 }
 void UpdateDrawFrame(void)
@@ -82,19 +106,24 @@ void UpdateDrawFrame(void)
 	for (size_t i = 0; i < gs.pizza_count; i++) {
 		Pizza *p = &gs.pizzas[i];
 		p->rotation += delta * 10 * p->rot_speed;
+		p->rotation = fmodf(p->rotation, 360.0);
 		draw_pizza(p);
+		DrawText(TextFormat("%zu", current_slice(p)), 0, 0, 20, GREEN);
 	}
 	// DrawFPS(10, 10);
 	EndDrawing();
 }
 int main()
 {
+	// printf("%zu\n",sizeof(GameState));
 	gs.screen_width = 1920;
 	gs.screen_height = 1080;
 	SetConfigFlags(FLAG_VSYNC_HINT);
 	InitWindow(gs.screen_width, gs.screen_height, "raylib - project_name");
-	gs.pizza_texture = LoadTexture("assets/Pizza.PNG");
+	gs.pizza_texture = LoadTexture("assets/Pizza.png");
+	gs.pepperoni_texture = LoadTexture("assets/pepperoni.png");
 	gs.pizza_texture_scale = 0.40;
+	gs.pepperoni_texture_scale = 0.40;
 
 	size_t pizza_index = get_pizza();
 	{

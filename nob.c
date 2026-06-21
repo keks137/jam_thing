@@ -12,7 +12,13 @@ bool web = false;
 bool nobuild = false;
 bool run = false;
 const char *rayfiles[] = {
-	"rglfw", "raudio", "rcore", "rmodels", "rshapes", "rtext", "rtextures",
+	"rglfw",
+	"raudio",
+	"rcore",
+	"rmodels",
+	"rshapes",
+	"rtext",
+	"rtextures",
 };
 
 bool build_raylib_linux(Nob_Cmd *cmd)
