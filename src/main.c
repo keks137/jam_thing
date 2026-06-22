@@ -32,8 +32,6 @@ typedef enum {
   RESULTS_DISPLAY,
 } GamePhase;
 
-#define PIZZA_RADIUS 90
-#define PIZZA_BASE_ROTATION_SPEED 100
 
 typedef enum {
   NONE,
@@ -54,18 +52,33 @@ typedef struct {
   size_t capacity;
 } Toppings;
 
+#define PIZZA_RADIUS 90
+#define PIZZA_BASE_ROTATION_SPEED 100
+
 typedef struct {
   size_t number_of_slices;
   Toppings toppings;
   float rotation;
+  Vector2 position;
+  RenderTexture2D tex;
 } Pizza;
+
+typedef struct {
+  Pizza* items;
+  size_t count;
+  size_t capacity;
+} Pizzas;
+
+typedef size_t PizzaIndex;
+
+#define PIZZA_ROTATOR_RADIUS 90
 
 typedef struct {
   float rotation_speed;
   bool active;
-  Pizza pizza;
-  RenderTexture2D tex;
+  PizzaIndex pizza_index;
   Vector2 position;
+  RenderTexture2D tex;
 } PizzaRotator;
 
 typedef struct {
@@ -83,10 +96,12 @@ typedef struct {
 } Orders;
 
 PizzaRotator rotators[3] = {
-  {.rotation_speed = 0, .active = false, .pizza = {0}, .tex = {0}, .position = {0}},
-  {.rotation_speed = 0, .active = false, .pizza = {0}, .tex = {0}, .position = {0}},
-  {.rotation_speed = 0, .active = false, .pizza = {0}, .tex = {0}, .position = {0}},
+  {.rotation_speed = 0, .active = false, .pizza_index = 0, .tex = {0}, .position = {0}},
+  {.rotation_speed = 0, .active = false, .pizza_index = 0, .tex = {0}, .position = {0}},
+  {.rotation_speed = 0, .active = false, .pizza_index = 0, .tex = {0}, .position = {0}},
 };
+
+Pizzas pizzas = {0};
 
 GamePhase game_phase = EARLY_PHASE;
 Orders orders = {0};
@@ -108,10 +123,17 @@ int main()
       .x = PIZZA_RADIUS*(2*i+1)+65*(i+1),
       .y = SCREEN_HEIGHT*13/20
     };
-    rotators[i].tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2); 
-    rotators[i].pizza.number_of_slices = 6;
+    rotators[i].tex = LoadRenderTexture(PIZZA_ROTATOR_RADIUS*2, PIZZA_ROTATOR_RADIUS*2); 
   }
   rotators[1].active = true;
+  da_append(&pizzas, ((Pizza){
+    .number_of_slices = 6,
+    .rotation = 0,
+    .position = rotators[1].position,
+    .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+    .toppings = {0}, 
+  }));
+  rotators[1].pizza_index = 0;
 
 #if defined(PLATFORM_WEB)
 	emscripten_set_main_loop(UpdateDrawFrame, 60, 1);
@@ -178,7 +200,7 @@ static void UpdateDrawFrame(void)
 
   for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
     if (rotators[i].active) {
-      rotators[i].pizza.rotation += rotators[i].rotation_speed * dt / PIZZA_RADIUS;
+      pizzas.items[rotators[i].pizza_index].rotation += rotators[i].rotation_speed * dt / PIZZA_RADIUS;
     }
   }
 
@@ -200,11 +222,11 @@ static void UpdateDrawFrame(void)
       Vector2 triangle_verts[3] = {
         rotators[i].position,
         {
-          .x = rotators[i].position.x - PIZZA_RADIUS*tan(PI/rotators[i].pizza.number_of_slices),
+          .x = rotators[i].position.x - PIZZA_RADIUS*tan(PI/pizzas.items[rotators[i].pizza_index].number_of_slices),
           .y = rotators[i].position.y-PIZZA_RADIUS
         },
         {
-          .x = rotators[i].position.x + PIZZA_RADIUS*tan(PI/rotators[i].pizza.number_of_slices),
+          .x = rotators[i].position.x + PIZZA_RADIUS*tan(PI/pizzas.items[rotators[i].pizza_index].number_of_slices),
           .y = rotators[i].position.y-PIZZA_RADIUS
         },
       };
@@ -214,9 +236,9 @@ static void UpdateDrawFrame(void)
         .type = topping_selected,
         .offset_from_center = Vector2Distance(mouse_pos, rotators[i].position),
         .rotation = atan2f(mouse_pos.y - rotators[i].position.y,
-                        mouse_pos.x - rotators[i].position.x) - rotators[i].pizza.rotation,
+                        mouse_pos.x - rotators[i].position.x) - pizzas.items[rotators[i].pizza_index].rotation,
       }; 
-      da_append(&rotators[i].pizza.toppings, topping);
+      da_append(&pizzas.items[rotators[i].pizza_index].toppings, topping);
     }
     topping_selected = NONE;
   }
@@ -238,34 +260,39 @@ static void UpdateDrawFrame(void)
 
     for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
       if (rotators[i].active) {
-        BeginTextureMode(rotators[i].tex); {
+        BeginTextureMode(pizzas.items[rotators[i].pizza_index].tex); {
           ClearBackground(BLANK);
 
           DrawCircle(PIZZA_RADIUS, PIZZA_RADIUS, PIZZA_RADIUS, RED);
-          for (size_t j = 1; j <= rotators[i].pizza.number_of_slices; j++) {
-            DrawLine(PIZZA_RADIUS, PIZZA_RADIUS, PIZZA_RADIUS + PIZZA_RADIUS * cosf(j*2*PI/rotators[i].pizza.number_of_slices), PIZZA_RADIUS + PIZZA_RADIUS * sinf(j*2*PI/rotators[i].pizza.number_of_slices), BLACK);
+          for (size_t j = 1; j <= pizzas.items[rotators[i].pizza_index].number_of_slices; j++) {
+            DrawLine(PIZZA_RADIUS, PIZZA_RADIUS, PIZZA_RADIUS + PIZZA_RADIUS * cosf(j*2*PI/pizzas.items[rotators[i].pizza_index].number_of_slices), PIZZA_RADIUS + PIZZA_RADIUS * sinf(j*2*PI/pizzas.items[rotators[i].pizza_index].number_of_slices), BLACK);
           }
 
-          for (size_t j = 0; j < rotators[i].pizza.toppings.count; j++) {
+          for (size_t j = 0; j < pizzas.items[rotators[i].pizza_index].toppings.count; j++) {
             Color topping_color = BLANK;
-            switch (rotators[i].pizza.toppings.items[j].type) {
+            switch (pizzas.items[rotators[i].pizza_index].toppings.items[j].type) {
               case MUSHROOM: topping_color = BEIGE; break;
               case OLIVE: topping_color = DARKGREEN; break;
               case PEPPERONI: topping_color = MAROON; break;
               default: assert(false && "unkown type of topping");
             }
             Rectangle rec = {
-              .x = PIZZA_RADIUS + rotators[i].pizza.toppings.items[j].offset_from_center * cosf(rotators[i].pizza.toppings.items[j].rotation),
-              .y = PIZZA_RADIUS + rotators[i].pizza.toppings.items[j].offset_from_center * sinf(rotators[i].pizza.toppings.items[j].rotation),
+              .x = PIZZA_RADIUS + pizzas.items[rotators[i].pizza_index].toppings.items[j].offset_from_center * cosf(pizzas.items[rotators[i].pizza_index].toppings.items[j].rotation),
+              .y = PIZZA_RADIUS + pizzas.items[rotators[i].pizza_index].toppings.items[j].offset_from_center * sinf(pizzas.items[rotators[i].pizza_index].toppings.items[j].rotation),
               .width = 18,
               .height = 18,
             };
-            DrawRectanglePro(rec, (Vector2){.x = 9, .y = 9}, rotators[i].pizza.toppings.items[j].rotation * RAD2DEG, topping_color);
+            DrawRectanglePro(rec, (Vector2){.x = 9, .y = 9}, pizzas.items[rotators[i].pizza_index].toppings.items[j].rotation * RAD2DEG, topping_color);
           }
         } EndTextureMode();
 
+        // TODO: if the image of rotator is also rotating, need to add rotation while drawing
+        BeginTextureMode(rotators[i].tex); {
+          ClearBackground(BLANK);
+        } EndTextureMode();
+        DrawTexture(rotators[i].tex.texture, rotators[i].position.x, rotators[i].position.y, WHITE);
         DrawTexturePro(
-          rotators[i].tex.texture,
+          pizzas.items[rotators[i].pizza_index].tex.texture,
           (Rectangle){
               0,
               0,
@@ -282,11 +309,11 @@ static void UpdateDrawFrame(void)
               rotators[i].tex.texture.width/2.0f,
               rotators[i].tex.texture.height/2.0f
           },
-          rotators[i].pizza.rotation * RAD2DEG,
+          pizzas.items[rotators[i].pizza_index].rotation * RAD2DEG,
           WHITE
         );
 
-        DrawCircleSectorLines((Vector2){rotators[i].position.x, rotators[i].position.y}, PIZZA_RADIUS, 270-180/rotators[i].pizza.number_of_slices, 270+180/rotators[i].pizza.number_of_slices, 100, YELLOW);
+        DrawCircleSectorLines((Vector2){rotators[i].position.x, rotators[i].position.y}, PIZZA_RADIUS, 270-180/pizzas.items[rotators[i].pizza_index].number_of_slices, 270+180/pizzas.items[rotators[i].pizza_index].number_of_slices, 100, YELLOW);
       } else {
         DrawCircle(PIZZA_RADIUS*(2*i+1)+65*(i+1), SCREEN_HEIGHT*13/20, PIZZA_RADIUS, GRAY);
       }
