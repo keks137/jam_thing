@@ -8,10 +8,8 @@
 #define NOB_IMPLEMENTATION
 #include "../nob.h"
 
-#include "../vendor/raylib/src/raylib.h"
-#include "../vendor/raylib/src/raymath.h"
-// #include "raylib.h"
-// #include "raymath.h"
+#include <raylib.h>
+#include <raymath.h>
 
 #if defined(PLATFORM_WEB)
 #include <emscripten/emscripten.h>
