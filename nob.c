@@ -311,7 +311,7 @@ bool build_web(Nob_Cmd *cmd)
 	cmd_append(cmd, "--shell-file");
 	cmd_append(cmd, SRC_DIR "shell.html");
 	cmd_append(cmd, BUILD_DIR "raylib_web/libraylib.a");
-  // cmd_append(cmd, "--embed-file", "assets");
+  	cmd_append(cmd, "--embed-file", "assets");
 	cmd_append(cmd, "-I" RSOURCE);
 	cmd_append(cmd, "-I" SRC_DIR);
 	cmd_append(cmd, "-Ivendor");

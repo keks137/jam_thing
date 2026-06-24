@@ -9,7 +9,7 @@
             "command": "build",
             "args": [],
             "windows": {
-                "command": "build.bat",
+                "command": "build_web.bat",
                 "args": [ ],
             },
 	    "osx": {
