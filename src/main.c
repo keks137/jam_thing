@@ -32,16 +32,21 @@ typedef enum {
 
 
 typedef enum {
-  NONE,
-  MUSHROOM,
-  OLIVE,
-  PEPPERONI,
+  TOPPING_NONE,
+  TOPPING_MUSHROOM,
+  TOPPING_OLIVE,
+  TOPPING_PEPPERONI,
 } ToppingType;
+
+typedef enum {
+  TOPPING_POSITION_NONE,
+} ToppingPosition;
 
 typedef struct {
   float offset_from_center;
   float rotation;
   ToppingType type;
+  ToppingPosition requested_position;
 } Topping;
 
 typedef struct {
@@ -55,6 +60,7 @@ typedef struct {
 
 typedef struct {
   size_t number_of_slices;
+  size_t order_index;
   Toppings toppings;
   float rotation;
   Vector2 position;
@@ -74,18 +80,20 @@ typedef size_t PizzaIndex;
 
 typedef struct {
   float rotation_speed;
-  bool has_pizza;
+  bool active;
+  size_t order_index;
   bool spinning;
   PizzaIndex pizza_index;
   Vector2 position;
-  RenderTexture2D tex;
 } PizzaRotator;
 
 typedef struct {
   bool completed;
   double order_time;
   double deliver_time;
-  Toppings requested;
+  Toppings requested_toppings;
+  size_t rotator_index;
+  size_t pizza_index;
 } Order;
 
 typedef struct {
@@ -111,8 +119,8 @@ GamePhase game_phase = EARLY_PHASE;
 float start_time = 0;
 
 PizzaRotator rotators[2] = {
-  {.rotation_speed = 0, .has_pizza = false, .pizza_index = 0, .tex = {0}, .position = {0}},
-  {.rotation_speed = 0, .has_pizza = false, .pizza_index = 0, .tex = {0}, .position = {0}},
+  {.rotation_speed = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}},
+  {.rotation_speed = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}},
 };
 
 Pizzas pizzas = {0};
@@ -121,13 +129,14 @@ ConveryorBelt conveyor_belt = {0};
 
 Orders orders = {0};
 
-ToppingType topping_selected = NONE;
+ToppingType topping_selected = TOPPING_NONE;
 
 int min_time_from_last_order = 15;
 int max_active_orders = 1;
 
 Texture2D backgroundTex;
 Texture2D speedControllerTex;
+
 bool draggingLeftCtrl = false;
 bool draggingRightCtrl = false;
 
@@ -138,12 +147,11 @@ int main()
 
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Spinzza");
   //ToggleFullscreen();
-  backgroundTex = LoadTexture(BACKGROUNDIMG);
-  speedControllerTex = LoadTexture(SPEEDCONTROLLERIMG);
+  backgroundTex = LoadTexture(BACKGROUND_IMG);
+  speedControllerTex = LoadTexture(SPEED_CONTROLLER_IMG);
 
   for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
     rotators[i].rotation_speed = PIZZA_BASE_ROTATION_SPEED;
-    rotators[i].tex = LoadRenderTexture(PIZZA_ROTATOR_RADIUS*2, PIZZA_ROTATOR_RADIUS*2); 
   }
   rotators[0].position = (Vector2){
     .x = 529,
@@ -153,18 +161,7 @@ int main()
     .x = 1419,
     .y = 832
   };
-  rotators[0].has_pizza = true;
-  rotators[0].spinning = true;
 
-  da_append(&pizzas, ((Pizza){
-    .number_of_slices = 6,
-    .rotation = 0,
-    .position = rotators[0].position,
-    .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
-    .toppings = {0}, 
-    .delivered = false,
-  }));
-  rotators[0].pizza_index = 0;
   
 
 #if defined(PLATFORM_WEB)
@@ -176,9 +173,11 @@ int main()
 		UpdateDrawFrame();
 #endif
 
-  for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-    UnloadRenderTexture(rotators[i].tex);
+  for (size_t i = 0; i < pizzas.count; i++) {
+    if (!pizzas.items[i].delivered) UnloadRenderTexture(pizzas.items[i].tex);
   }
+  UnloadTexture(backgroundTex);
+  UnloadTexture(speedControllerTex);
 
 	CloseWindow();
 
@@ -202,7 +201,6 @@ static void UpdateDrawFrame(void)
     case MIDDLE_PHASE: {
       if (time  - start_time >= MIDDLE_PHASE) {
         game_phase = END_PHASE;
-        max_active_orders = 4;
         break;
       }
 
@@ -219,38 +217,57 @@ static void UpdateDrawFrame(void)
     } break;
   }
 
-  if (orders.count == 0 || (time - da_last(&orders).deliver_time > min_time_from_last_order && orders.active < max_active_orders)) {
-    if ((rand() % 100 + 1) > (99 - (int)(time - (orders.count == 0 ? 0 : da_last(&orders).deliver_time) - min_time_from_last_order))) {
+  if (orders.active < max_active_orders) {
     Order order = {
-        .completed = false,
-        .order_time = time,
-        .deliver_time = 0,
-      };
-      da_append(&orders, order);
-      orders.active += 1;
+      .completed = false,
+      .order_time = time,
+      .deliver_time = 0,
+      // TODO: write logic for requested pizza
+      .requested_toppings = {0},
+    };
+    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
+      if (rotators[i].active) continue;
+      order.rotator_index = i;
+      rotators[i].order_index = orders.count;
+      order.pizza_index = pizzas.count;
+      rotators[i].pizza_index = pizzas.count;
+      rotators[i].active = true;
+      rotators[i].spinning = true;
+      da_append(&pizzas, ((Pizza){
+        .number_of_slices = 6,
+        .order_index = orders.count,
+        .rotation = 0,
+        .position = rotators[i].position,
+        .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .toppings = {0}, 
+        .delivered = false,
+      }));
+      break;
     }
+    da_append(&orders, order);
+    orders.active += 1;
   }
 
   for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-    if (rotators[i].has_pizza && rotators[i].spinning) {
+    if (rotators[i].active && rotators[i].spinning) {
       pizzas.items[rotators[i].pizza_index].rotation += rotators[i].rotation_speed * dt;
     }
   }
 
-  if (topping_selected == NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT) 
+  if (topping_selected == TOPPING_NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT) 
     && mouse_pos.y < SCREEN_HEIGHT*3/10 && mouse_pos.x < SCREEN_WIDTH*2/5) {
     if (mouse_pos.x < SCREEN_WIDTH*2/5*1/3) {
-      topping_selected = MUSHROOM;
+      topping_selected = TOPPING_MUSHROOM;
     } else if (mouse_pos.x < SCREEN_WIDTH*2/5*2/3) {
-      topping_selected = OLIVE;
+      topping_selected = TOPPING_OLIVE;
     } else {
-      topping_selected = PEPPERONI;
+      topping_selected = TOPPING_PEPPERONI;
     }
   }
 
-  if (topping_selected != NONE && IsMouseButtonUp(MOUSE_BUTTON_LEFT)) {
+  if (topping_selected != TOPPING_NONE && IsMouseButtonUp(MOUSE_BUTTON_LEFT)) {
     for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-      if (!rotators[i].has_pizza && rotators[i].spinning) continue;
+      if (!rotators[i].active && rotators[i].spinning) continue;
       if (!CheckCollisionPointCircle(mouse_pos, rotators[i].position, PIZZA_RADIUS)) continue;
       Vector2 triangle_verts[3] = {
         rotators[i].position,
@@ -270,10 +287,11 @@ static void UpdateDrawFrame(void)
         .offset_from_center = Vector2Distance(mouse_pos, rotators[i].position),
         .rotation = atan2f(mouse_pos.y - rotators[i].position.y,
                         mouse_pos.x - rotators[i].position.x) - pizzas.items[rotators[i].pizza_index].rotation,
+        .requested_position = TOPPING_POSITION_NONE
       }; 
       da_append(&pizzas.items[rotators[i].pizza_index].toppings, topping);
     }
-    topping_selected = NONE;
+    topping_selected = TOPPING_NONE;
   }
 
 	BeginDrawing(); {
@@ -302,66 +320,35 @@ static void UpdateDrawFrame(void)
     DrawTexture(speedControllerTex, 1030, rightY, WHITE);
 
 
-    bool openToDrag = topping_selected == NONE && IsMouseButtonDown(0);
+    bool openToDrag = topping_selected == TOPPING_NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
     
-    if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){845.0f, (float)leftY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl) {
+    if (CheckCollisionPointRec(mouse_pos, (Rectangle){845.0f, (float)leftY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl) {
       draggingLeftCtrl = true;
       
     }
-    if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){1030.0f, (float)rightY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl) {
+    if (CheckCollisionPointRec(mouse_pos, (Rectangle){1030.0f, (float)rightY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl) {
       draggingRightCtrl = true;
       
     }
     if (draggingLeftCtrl) {
       
-      rotators[0].rotation_speed = ((float)(((GetMousePosition().y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
+      rotators[0].rotation_speed = ((float)(((mouse_pos.y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
       rotators[0].rotation_speed = minSpeed + maxSpeed * (round(((rotators[0].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
       rotators[0].rotation_speed = (((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) : maxSpeed;
 
-      if (!IsMouseButtonDown(0)) {
+      if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
         draggingLeftCtrl = false;
       }
     } if (draggingRightCtrl) {
       DrawRectangle(10,10, 30, 30, BLUE);
-      rotators[1].rotation_speed = ((float)(((GetMousePosition().y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
+      rotators[1].rotation_speed = ((float)(((mouse_pos.y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
       rotators[1].rotation_speed = minSpeed + maxSpeed * (round(((rotators[1].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
       rotators[1].rotation_speed = (((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) : maxSpeed;
 
       
-      if (!IsMouseButtonDown(0)) {
+      if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
         draggingRightCtrl = false;
       }
-    }
-
-    
-
-    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-      BeginTextureMode(rotators[i].tex); {
-        ClearBackground(BLANK);
-        DrawCircle(PIZZA_ROTATOR_RADIUS, PIZZA_ROTATOR_RADIUS, PIZZA_ROTATOR_RADIUS, GRAY);
-      } EndTextureMode();
-      // TODO: if the image of rotator is also rotating, need to add rotation while drawing
-      DrawTexturePro(
-        rotators[i].tex.texture,
-        (Rectangle){
-            0,
-            0,
-            rotators[i].tex.texture.width,
-            -rotators[i].tex.texture.height
-        },
-        (Rectangle){
-            rotators[i].position.x,
-            rotators[i].position.y,
-            rotators[i].tex.texture.width,
-            rotators[i].tex.texture.height
-        },
-        (Vector2){
-            rotators[i].tex.texture.width/2.0f,
-            rotators[i].tex.texture.height/2.0f
-        },
-        0,
-        WHITE
-      );
     }
 
     for (size_t i = 0; i < pizzas.count; i ++) {
@@ -377,9 +364,9 @@ static void UpdateDrawFrame(void)
         for (size_t j = 0; j < pizzas.items[i].toppings.count; j++) {
           Color topping_color = BLANK;
           switch (pizzas.items[i].toppings.items[j].type) {
-            case MUSHROOM: topping_color = BEIGE; break;
-            case OLIVE: topping_color = DARKGREEN; break;
-            case PEPPERONI: topping_color = MAROON; break;
+            case TOPPING_MUSHROOM: topping_color = BEIGE; break;
+            case TOPPING_OLIVE: topping_color = DARKGREEN; break;
+            case TOPPING_PEPPERONI: topping_color = MAROON; break;
             default: assert(false && "unkown type of topping");
           }
           Rectangle rec = {
@@ -419,13 +406,13 @@ static void UpdateDrawFrame(void)
       DrawCircleSectorLines((Vector2){rotators[i].position.x, rotators[i].position.y}, PIZZA_RADIUS, 270-180/pizzas.items[rotators[i].pizza_index].number_of_slices, 270+180/pizzas.items[rotators[i].pizza_index].number_of_slices, 100, YELLOW);
     }
 
-    if (topping_selected != NONE) {
+    if (topping_selected != TOPPING_NONE) {
       Color topping_color = BLANK;
       switch (topping_selected) {
-        case NONE: break;
-        case MUSHROOM: topping_color = BEIGE; break;
-        case OLIVE: topping_color = DARKGREEN; break;
-        case PEPPERONI: topping_color = MAROON; break;
+        case TOPPING_NONE: break;
+        case TOPPING_MUSHROOM: topping_color = BEIGE; break;
+        case TOPPING_OLIVE: topping_color = DARKGREEN; break;
+        case TOPPING_PEPPERONI: topping_color = MAROON; break;
         default: assert(false && "unknown topping to render");
       }
       DrawRectangle(mouse_pos.x-18/2, mouse_pos.y-18/2, 18, 18, topping_color);
