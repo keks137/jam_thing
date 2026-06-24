@@ -15,14 +15,14 @@
 #include <emscripten/emscripten.h>
 #endif
 
-#define SCREEN_WIDTH  800
-#define SCREEN_HEIGHT 400
+#define SCREEN_WIDTH  1920
+#define SCREEN_HEIGHT 1080
 
 #define GAME_TIME 360
 #define EARLY_PHASE_TIME 120
 #define MIDDLE_PHASE_TIME 120
 #define END_PHASE_TIME 120
-
+#define FPS 60
 typedef enum {
   EARLY_PHASE,
   MIDDLE_PHASE,
@@ -50,8 +50,8 @@ typedef struct {
   size_t capacity;
 } Toppings;
 
-#define PIZZA_RADIUS 90
-#define PIZZA_BASE_ROTATION_SPEED 100
+#define PIZZA_RADIUS 209
+#define PIZZA_BASE_ROTATION_SPEED 31.415 * (PI / 180)
 
 typedef struct {
   size_t number_of_slices;
@@ -126,27 +126,36 @@ ToppingType topping_selected = NONE;
 int min_time_from_last_order = 15;
 int max_active_orders = 1;
 
+Texture2D backgroundTex;
+Texture2D speedControllerTex;
+bool draggingLeftCtrl = false;
+bool draggingRightCtrl = false;
+
 static void UpdateDrawFrame(void);
 
 int main()
 {
 
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Spinzza");
+  //ToggleFullscreen();
+  backgroundTex = LoadTexture(BACKGROUNDIMG);
+  speedControllerTex = LoadTexture(SPEEDCONTROLLERIMG);
 
   for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
     rotators[i].rotation_speed = PIZZA_BASE_ROTATION_SPEED;
     rotators[i].tex = LoadRenderTexture(PIZZA_ROTATOR_RADIUS*2, PIZZA_ROTATOR_RADIUS*2); 
   }
   rotators[0].position = (Vector2){
-    .x = SCREEN_WIDTH/2 - PIZZA_ROTATOR_RADIUS - 50,
-    .y = SCREEN_HEIGHT*13/20
+    .x = 529,
+    .y = 832
   };
   rotators[1].position = (Vector2){
-    .x = SCREEN_WIDTH/2 + PIZZA_ROTATOR_RADIUS + 50,
-    .y = SCREEN_HEIGHT*13/20
+    .x = 1419,
+    .y = 832
   };
   rotators[0].has_pizza = true;
   rotators[0].spinning = true;
+
   da_append(&pizzas, ((Pizza){
     .number_of_slices = 6,
     .rotation = 0,
@@ -156,11 +165,12 @@ int main()
     .delivered = false,
   }));
   rotators[0].pizza_index = 0;
+  
 
 #if defined(PLATFORM_WEB)
 	emscripten_set_main_loop(UpdateDrawFrame, 60, 1);
 #else
-	SetTargetFPS(60);
+	SetTargetFPS(FPS);
 
 	while (!WindowShouldClose())
 		UpdateDrawFrame();
@@ -223,7 +233,7 @@ static void UpdateDrawFrame(void)
 
   for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
     if (rotators[i].has_pizza && rotators[i].spinning) {
-      pizzas.items[rotators[i].pizza_index].rotation += rotators[i].rotation_speed * dt / PIZZA_RADIUS;
+      pizzas.items[rotators[i].pizza_index].rotation += rotators[i].rotation_speed * dt;
     }
   }
 
@@ -268,18 +278,62 @@ static void UpdateDrawFrame(void)
 
 	BeginDrawing(); {
     ClearBackground(WHITE);
+    DrawTexture(backgroundTex, 0, 0, WHITE);
 
-    DrawRectangle(0, 0, SCREEN_WIDTH*2/5*1/3, SCREEN_HEIGHT*3/10, BEIGE);
-    DrawLine(SCREEN_WIDTH*2/5*1/3, 0, SCREEN_WIDTH*2/5*1/3, SCREEN_HEIGHT*3/10, BLACK);
-    DrawRectangle(SCREEN_WIDTH*2/5*1/3, 0, SCREEN_WIDTH*2/5*1/3, SCREEN_HEIGHT*3/10, DARKGREEN);
-    DrawLine(SCREEN_WIDTH*2/5*2/3, 0, SCREEN_WIDTH*2/5*2/3, SCREEN_HEIGHT*3/10, BLACK);
-    DrawRectangle(SCREEN_WIDTH*2/5*2/3, 0, SCREEN_WIDTH*2/5*1/3, SCREEN_HEIGHT*3/10, MAROON);
-    DrawLine(SCREEN_WIDTH*2/5, 0, SCREEN_WIDTH*2/5, SCREEN_HEIGHT*3/10, BLACK);
+    // Flag
+    
 
-    DrawRectangle(SCREEN_WIDTH*2/5, 0, SCREEN_WIDTH*3/5, SCREEN_HEIGHT*3/10, GRAY);
 
-    DrawRectangle(0, SCREEN_HEIGHT*3/10, SCREEN_WIDTH, SCREEN_HEIGHT*7/10, BROWN);
-    DrawLine(0, SCREEN_HEIGHT*3/10, SCREEN_WIDTH, SCREEN_HEIGHT*3/10, BLACK);
+ 
+
+    // RPM controller
+
+    int topY =  817;
+    int bottomY = 1025;
+    float minSpeed = 31.415 * (PI / 180);
+    float maxSpeed = minSpeed * 4;
+
+
+    int leftY = topY + ((rotators[0].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
+    int rightY = topY + ((rotators[1].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
+    //DrawTexture(speedControllerTex, 845, leftY, WHITE);
+    //DrawTexture(speedControllerTex, 1030, rightY, WHITE);
+    DrawTexture(speedControllerTex, 845, leftY, WHITE);
+    DrawTexture(speedControllerTex, 1030, rightY, WHITE);
+
+
+    bool openToDrag = topping_selected == NONE && IsMouseButtonDown(0);
+    
+    if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){845.0f, (float)leftY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl) {
+      draggingLeftCtrl = true;
+      
+    }
+    if (CheckCollisionPointRec(GetMousePosition(), (Rectangle){1030.0f, (float)rightY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl) {
+      draggingRightCtrl = true;
+      
+    }
+    if (draggingLeftCtrl) {
+      
+      rotators[0].rotation_speed = ((float)(((GetMousePosition().y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
+      rotators[0].rotation_speed = minSpeed + maxSpeed * (round(((rotators[0].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
+      rotators[0].rotation_speed = (((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) : maxSpeed;
+
+      if (!IsMouseButtonDown(0)) {
+        draggingLeftCtrl = false;
+      }
+    } if (draggingRightCtrl) {
+      DrawRectangle(10,10, 30, 30, BLUE);
+      rotators[1].rotation_speed = ((float)(((GetMousePosition().y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
+      rotators[1].rotation_speed = minSpeed + maxSpeed * (round(((rotators[1].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
+      rotators[1].rotation_speed = (((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) : maxSpeed;
+
+      
+      if (!IsMouseButtonDown(0)) {
+        draggingRightCtrl = false;
+      }
+    }
+
+    
 
     for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
       BeginTextureMode(rotators[i].tex); {
