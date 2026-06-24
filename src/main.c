@@ -55,7 +55,7 @@ typedef struct {
   size_t capacity;
 } Toppings;
 
-#define PIZZA_RADIUS 209
+#define PIZZA_RADIUS 236
 #define PIZZA_BASE_ROTATION_SPEED 31.415 * (PI / 180)
 
 typedef struct {
@@ -137,6 +137,20 @@ int max_active_orders = 1;
 Texture2D backgroundTex;
 Texture2D speedControllerTex;
 
+Texture2D pizzaBaseImg;
+
+
+#define INGREDIENT_SCALE 0.3;
+Texture2D mushroomImg;
+Texture2D oliveImg;
+Texture2D pepperoniImg;
+
+Texture2D tossButtonImg;
+Texture2D serverButtonImg;
+
+Texture2D foregroundConveyorImg;
+Texture2D gameTimePointer;
+
 bool draggingLeftCtrl = false;
 bool draggingRightCtrl = false;
 
@@ -150,16 +164,30 @@ int main()
   backgroundTex = LoadTexture(BACKGROUND_IMG);
   speedControllerTex = LoadTexture(SPEED_CONTROLLER_IMG);
 
+  pizzaBaseImg = LoadTexture(PIZZA_BASE_IMG);
+  mushroomImg = LoadTexture(MUSHROOM_IMG);
+  oliveImg = LoadTexture(OLIVE_IMG);
+  pepperoniImg = LoadTexture(PEPPERONI_IMG);
+
+  tossButtonImg = LoadTexture(TOSS_BUTTON_IMG);
+  serverButtonImg = LoadTexture(SERVER_BUTTON_IMG);
+
+  foregroundConveyorImg = LoadTexture(FOREGROUND_CONVEYOR_BELT);
+  gameTimePointer = LoadTexture(GAME_TIME_POINTER);
+
+
+
+
   for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
     rotators[i].rotation_speed = PIZZA_BASE_ROTATION_SPEED;
   }
   rotators[0].position = (Vector2){
-    .x = 529,
-    .y = 832
+    .x = 503,
+    .y = 795
   };
   rotators[1].position = (Vector2){
-    .x = 1419,
-    .y = 832
+    .x = 1415,
+    .y = 795
   };
 
   
@@ -183,6 +211,8 @@ int main()
 
 	return 0;
 }
+
+float ptrRotation = 0;
 
 static void UpdateDrawFrame(void)
 {
@@ -298,8 +328,71 @@ static void UpdateDrawFrame(void)
     ClearBackground(WHITE);
     DrawTexture(backgroundTex, 0, 0, WHITE);
 
-    // Flag
-    
+    DrawTexture(foregroundConveyorImg, 0, 0, WHITE);
+    DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
+    ptrRotation++;
+
+    DrawTexture(tossButtonImg, 5, 971, WHITE);
+    DrawTexture(serverButtonImg, 5, 865, WHITE);
+    DrawTexture(tossButtonImg, 1724, 971, WHITE);
+    DrawTexture(serverButtonImg, 1724, 865, WHITE);
+
+    Rectangle leftTossButton = {5, 971, 191, 104};
+    Rectangle rightTossButton = {1724, 971, 191, 104};
+    Rectangle leftServeButton = {5, 865, 191, 104};
+    Rectangle rightServeButton = {1724, 865, 191, 104};
+
+    if (IsMouseButtonPressed(0) && CheckCollisionPointRec(mouse_pos, leftTossButton)) {
+        pizzas.items[0] = (Pizza){
+        .number_of_slices = 6,
+        .order_index = orders.count,
+        .rotation = 0,
+        .position = rotators[0].position,
+        .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .toppings = {0}, 
+        .delivered = false,
+      };
+    }
+
+    if (IsMouseButtonPressed(0) && CheckCollisionPointRec(mouse_pos, rightTossButton)) {
+        pizzas.items[1] = (Pizza){
+        .number_of_slices = 6,
+        .order_index = orders.count,
+        .rotation = 0,
+        .position = rotators[1].position,
+        .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .toppings = {0}, 
+        .delivered = false,
+      };
+    }
+    if (IsMouseButtonPressed(0) && CheckCollisionPointRec(mouse_pos, leftServeButton)) {
+
+        // Change later to score based on orders.
+
+        pizzas.items[0] = (Pizza){
+        .number_of_slices = 6,
+        .order_index = orders.count,
+        .rotation = 0,
+        .position = rotators[0].position,
+        .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .toppings = {0}, 
+        .delivered = false,
+      };
+    }
+    if (IsMouseButtonPressed(0) && CheckCollisionPointRec(mouse_pos, rightServeButton)) {
+
+        // Change later to score based on orders.
+
+        pizzas.items[1] = (Pizza){
+        .number_of_slices = 6,
+        .order_index = orders.count,
+        .rotation = 0,
+        .position = rotators[1].position,
+        .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .toppings = {0}, 
+        .delivered = false,
+      };
+    }
 
 
  
@@ -356,26 +449,30 @@ static void UpdateDrawFrame(void)
       BeginTextureMode(pizzas.items[i].tex); {
         ClearBackground(BLANK);
 
-        DrawCircle(PIZZA_RADIUS, PIZZA_RADIUS, PIZZA_RADIUS, RED);
+        //DrawCircle(PIZZA_RADIUS, PIZZA_RADIUS, PIZZA_RADIUS, RED);
+        DrawTexture(pizzaBaseImg, 0, 0, WHITE);
         for (size_t j = 1; j <= pizzas.items[i].number_of_slices; j++) {
           DrawLine(PIZZA_RADIUS, PIZZA_RADIUS, PIZZA_RADIUS + PIZZA_RADIUS * cosf(j*2*PI/pizzas.items[i].number_of_slices), PIZZA_RADIUS + PIZZA_RADIUS * sinf(j*2*PI/pizzas.items[i].number_of_slices), BLACK);
         }
 
-        for (size_t j = 0; j < pizzas.items[i].toppings.count; j++) {
-          Color topping_color = BLANK;
+         for (size_t j = 0; j < pizzas.items[i].toppings.count; j++) {
+          Texture2D toppingTexture;
           switch (pizzas.items[i].toppings.items[j].type) {
-            case TOPPING_MUSHROOM: topping_color = BEIGE; break;
-            case TOPPING_OLIVE: topping_color = DARKGREEN; break;
-            case TOPPING_PEPPERONI: topping_color = MAROON; break;
-            default: assert(false && "unkown type of topping");
+            case TOPPING_NONE: break;
+            case TOPPING_MUSHROOM: toppingTexture = mushroomImg; break;
+            case TOPPING_OLIVE: toppingTexture = oliveImg; break;
+            case TOPPING_PEPPERONI: toppingTexture = pepperoniImg; break;
+            default: assert(false && "unknown topping to render");
           }
+          float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
+          float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
           Rectangle rec = {
             .x = PIZZA_RADIUS + pizzas.items[i].toppings.items[j].offset_from_center * cosf(pizzas.items[i].toppings.items[j].rotation),
             .y = PIZZA_RADIUS + pizzas.items[i].toppings.items[j].offset_from_center * sinf(pizzas.items[i].toppings.items[j].rotation),
-            .width = 18,
-            .height = 18,
+            .width = targetWidth,
+            .height = targetHeight,
           };
-          DrawRectanglePro(rec, (Vector2){.x = 9, .y = 9}, pizzas.items[i].toppings.items[j].rotation * RAD2DEG, topping_color);
+          DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height},rec, (Vector2){.x = targetWidth / 2, .y = targetHeight / 2}, pizzas.items[i].toppings.items[j].rotation * RAD2DEG, WHITE);
         }
       } EndTextureMode();
 
@@ -407,16 +504,20 @@ static void UpdateDrawFrame(void)
     }
 
     if (topping_selected != TOPPING_NONE) {
-      Color topping_color = BLANK;
+      Texture2D toppingTexture;
       switch (topping_selected) {
         case TOPPING_NONE: break;
-        case TOPPING_MUSHROOM: topping_color = BEIGE; break;
-        case TOPPING_OLIVE: topping_color = DARKGREEN; break;
-        case TOPPING_PEPPERONI: topping_color = MAROON; break;
+        case TOPPING_MUSHROOM: toppingTexture = mushroomImg; break;
+        case TOPPING_OLIVE: toppingTexture = oliveImg; break;
+        case TOPPING_PEPPERONI: toppingTexture = pepperoniImg; break;
         default: assert(false && "unknown topping to render");
       }
-      DrawRectangle(mouse_pos.x-18/2, mouse_pos.y-18/2, 18, 18, topping_color);
-      DrawRectangleLines(mouse_pos.x-18/2, mouse_pos.y-18/2, 18, 18, BLACK);
+      //DrawRectangle(mouse_pos.x-18/2, mouse_pos.y-18/2, 18, 18, topping_color);
+      float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
+      float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
+      Rectangle targetRect = {mouse_pos.x - targetWidth / 2, mouse_pos.y - targetHeight / 2, targetWidth, targetHeight};
+      DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height}, targetRect, (Vector2){0,0}, 0, WHITE);
+      
     }
   } EndDrawing();
 }
