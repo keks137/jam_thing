@@ -7,6 +7,8 @@
 #define BACKGROUND_IMG ASSETS_DIR "background.png"
 
 #define SPEED_CONTROLLER_IMG ASSETS_DIR "speed-control-slider.png"
+#define ROBOT_ARM_LEFT_IMG ASSETS_DIR "robot-arm-left.png"
+#define ROBOT_ARM_RIGHT_IMG ASSETS_DIR "robot-arm-right.png"
 
 #define BELT_FRAME_1 ASSETS_DIR "conveyor-belt-1.png"
 #define BELT_FRAME_2 ASSETS_DIR "conveyor-belt-2.png"

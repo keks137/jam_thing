@@ -177,6 +177,8 @@ Texture2D tossButtonImg;
 Texture2D serverButtonImg;
 
 Texture2D foregroundBelt;
+Texture2D robotArmLeft;
+Texture2D robotArmRight;
 Texture2D conveyorBeltFrames[3];
 int currentBeltFrame = 0;
 float beltTimer = 0;
@@ -201,6 +203,8 @@ int main()
 
   summer_font = LoadFont(SUMMER_FONT);
 
+  robotArmLeft = LoadTexture(ROBOT_ARM_LEFT_IMG);
+  robotArmRight = LoadTexture(ROBOT_ARM_RIGHT_IMG);
   backgroundTex = LoadTexture(BACKGROUND_IMG);
   speedControllerTex = LoadTexture(SPEED_CONTROLLER_IMG);
   blankOrderTicketTex = LoadTexture(ORDER_TICKET_BLANK_IMG);
@@ -599,6 +603,10 @@ static void UpdateDrawFrame(void)
     DrawTexture(speedControllerTex, 826, leftY, WHITE);
     DrawTexture(speedControllerTex, 1018, rightY, WHITE);
 
+
+    
+   
+
     
 
     bool openToDrag = topping_selected == TOPPING_NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
@@ -784,6 +792,31 @@ static void UpdateDrawFrame(void)
       float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
       Rectangle targetRect = {mouse_pos.x - targetWidth / 2, mouse_pos.y - targetHeight / 2, targetWidth, targetHeight};
       DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height}, targetRect, (Vector2){0,0}, 0, WHITE);
+    }
+    {
+    Vector2 left_arm_pos = {820,385};
+    float left_arm_angle = 0;
+    if (mouse_pos.x <= left_arm_pos.x) left_arm_angle = atan2f(left_arm_pos.y - mouse_pos.y,  left_arm_pos.x - mouse_pos.x ) * RAD2DEG;
+       // DrawText(TextFormat("%f",left_arm_angle),0,0,30,YELLOW);
+    float left_arm_rot = Clamp(left_arm_angle, -46, 70);
+    DrawTexturePro( robotArmLeft, (Rectangle){0, 0, robotArmLeft.width, robotArmLeft.height},
+		    (Rectangle){left_arm_pos.x, left_arm_pos.y, robotArmLeft.width, robotArmLeft.height},
+		    (Vector2){robotArmLeft.width - 40, robotArmLeft.height / 2.0f}, 
+		    left_arm_rot , WHITE);
+    }
+    {
+    Vector2 right_arm_pos = {1090,385};
+
+    float right_arm_angle = 0;
+    if (mouse_pos.x >= right_arm_pos.x) right_arm_angle = atan2f( mouse_pos.y - right_arm_pos.y ,   mouse_pos.x - right_arm_pos.x  ) * RAD2DEG;
+       // DrawText(TextFormat("%f",right_arm_angle),0,0,30,YELLOW);
+    float right_arm_rot = Clamp(right_arm_angle, -70, 46);
+    
+    DrawTexturePro( robotArmRight, (Rectangle){0, 0, robotArmRight.width, robotArmRight.height},
+		    (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
+		    (Vector2){ 40, robotArmRight.height / 2.0f}, 
+		    right_arm_rot , WHITE);
+    DrawText(TextFormat("%f %f",mouse_pos.x, mouse_pos.y),0,0,30,YELLOW);
     }
   } EndDrawing();
 }
