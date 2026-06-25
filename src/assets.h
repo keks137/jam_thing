@@ -22,8 +22,8 @@
 #define FETA_IMG ASSETS_DIR         "feta.png"
 #define SPINACH_IMG ASSETS_DIR      "spinach.png"
 
-#define TOSS_BUTTON_IMG ASSETS_DIR    "toss_button.png"
-#define SERVER_BUTTON_IMG ASSETS_DIR  "serve_button.png"
+#define TOSS_BUTTON_IMG ASSETS_DIR    "toss-button.png"
+#define SERVER_BUTTON_IMG ASSETS_DIR  "serve-button.png"
 
 #define ORDER_TICKET_BLANK_IMG       ASSETS_DIR "order-ticket-blank.png"
 #define PIZZA_ICON_ALTERNATING_1_IMG ASSETS_DIR "pizza-icon-alternating-1.png"

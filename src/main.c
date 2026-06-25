@@ -133,7 +133,7 @@ typedef struct {
 #define MIDDLE_PHASE_CONVEYOR_BELT_SPEED 5
 #define END_PHASE_CONVEYOR_BELT_SPEED 7
 
-#define CONVEYOR_BELT_INGREDIENT_GAP 475
+#define CONVEYOR_BELT_INGREDIENT_GAP 250
 
 typedef struct {
   ConveyorBeltIngredient* items;
@@ -199,9 +199,9 @@ int main()
   blankOrderTicketTex = LoadTexture(ORDER_TICKET_BLANK_IMG);
 
   orderTickets[0].render_tex = LoadRenderTexture(blankOrderTicketTex.width, blankOrderTicketTex.height);
-  orderTickets[0].position = (Vector2){.x = 10, .y = 300};
+  orderTickets[0].position = (Vector2){.x = 12, .y = 520};
   orderTickets[1].render_tex = LoadRenderTexture(blankOrderTicketTex.width, blankOrderTicketTex.height);
-  orderTickets[1].position = (Vector2){.x = SCREEN_WIDTH - blankOrderTicketTex.width - 10, .y = 300};
+  orderTickets[1].position = (Vector2){.x = 1734, .y = 520};
 
   conveyor_belt.speed = EARLY_PHASE_CONVEYOR_BELT_SPEED;
 
@@ -262,6 +262,143 @@ int main()
 	CloseWindow();
 
 	return 0;
+}
+
+typedef struct {
+    int index;
+    Toppings toppings;
+    float startAngle;
+
+} Slice;
+
+typedef struct {
+  Slice* items;
+  size_t count;
+  size_t capacity;
+} Slices;
+
+float GetScore(Pizza pizza, Order order) {
+  printf("SCORING\n");
+  float score = 0;
+
+  Slices slices = {0};
+
+  da_append(&slices, ((Slice){
+    .index = 0,
+    .toppings = {0},
+    .startAngle = ((2.0f * PI) / 6.0f) * 0
+  }));
+  da_append(&slices, ((Slice){
+    .index = 1,
+    .toppings = {0},
+    .startAngle = ((2.0f * PI) / 6.0f) * 1
+  }));
+
+  da_append(&slices, ((Slice){
+    .index = 0,
+    .toppings = {0},
+    .startAngle = ((2.0f * PI) / 6.0f) * 2
+  }));
+
+  da_append(&slices, ((Slice){
+    .index = 0,
+    .toppings = {0},
+    .startAngle = ((2.0f * PI) / 6.0f) * 3
+  }));
+
+  da_append(&slices, ((Slice){
+    .index = 0,
+    .toppings = {0},
+    .startAngle = ((2.0f * PI) / 6.0f) * 4
+  }));
+  
+  da_append(&slices, ((Slice){
+    .index = 0,
+    .toppings = {0},
+    .startAngle = ((2.0f * PI) / 6.0f) * 5
+  }));
+  
+  printf("toppings: %d \n", pizza.toppings.count);
+
+  int startSliceIndex = -1;
+
+  for (int toppingI = 0; toppingI < (int)pizza.toppings.count; toppingI++) {
+    for (int sliceI = 5; sliceI >= 0; sliceI--) {
+      //printf("%f |", slices.items[sliceI].startAngle);
+      //printf("%f\n", 2 * PI + fmodf((int)pizza.toppings.items[toppingI].rotation, 2 * PI));
+      if (slices.items[sliceI].startAngle < 2 * PI + fmodf((int)pizza.toppings.items[toppingI].rotation, 2 * PI)) {
+        da_append(&slices.items[sliceI].toppings, pizza.toppings.items[toppingI]);
+        if (startSliceIndex == -1) {
+          startSliceIndex = sliceI;
+        }
+        //printf("%d |", sliceI);
+        //printf("%d\n", (int)pizza.toppings.items[toppingI].type);
+        break;
+      }
+    }
+  }
+   for (int sliceI = 5; sliceI >= 0; sliceI--) { 
+      for (int toppingI = 0; toppingI < slices.items[sliceI].toppings.count; toppingI++) {
+        printf("%d |", sliceI);
+        printf("%d\n", (int)pizza.toppings.items[toppingI].type);
+      }
+   }
+  
+  for (int ruleI = 0; ruleI < order.requested_toppings.count; ruleI++) {
+    switch (order.requested_toppings.items[ruleI].requested_position) {
+      case TOPPING_POSITION_FULL: {
+        for (int sliceI = 0; sliceI < slices.count; sliceI++) {
+          bool seenTarget = false;
+          if (slices.items[sliceI].toppings.count == 0) {
+            //score--;
+          }
+          for (int toppingI = slices.items[sliceI].toppings.count - 1; toppingI >= 0; toppingI--) {
+            ToppingType topping = slices.items[sliceI].toppings.items[toppingI].type;
+            if (topping == order.requested_toppings.items[ruleI].type && !seenTarget) {
+              score++;
+              slices.items[sliceI].toppings.items[toppingI] = slices.items[sliceI].toppings.items[slices.items[sliceI].toppings.count - 1];
+              slices.items[sliceI].toppings.count--;
+              seenTarget = true;
+            } 
+          }
+        }
+        break;
+      }
+      case TOPPING_POSITION_HALF1: {
+        for (int i = 0; i < slices.count; i++) {
+          bool seenTarget = false;
+          int sliceI = (startSliceIndex + i) % slices.count;
+          for (int toppingI = slices.items[sliceI].toppings.count - 1; toppingI >= 0; toppingI--) {
+            ToppingType topping = slices.items[sliceI].toppings.items[toppingI].type;
+            if (topping == order.requested_toppings.items[ruleI].type && !seenTarget && i < 3) {
+              score++;
+              slices.items[sliceI].toppings.items[toppingI] = slices.items[sliceI].toppings.items[slices.items[sliceI].toppings.count - 1];
+              slices.items[sliceI].toppings.count--;
+              seenTarget = true;
+            } 
+          }
+        }
+        break;
+      }
+      case TOPPING_POSITION_HALF2: {
+        for (int i = 0; i < slices.count; i++) {
+          bool seenTarget = false;
+          int sliceI = (startSliceIndex + i) % slices.count;
+          for (int toppingI = slices.items[sliceI].toppings.count - 1; toppingI >= 0; toppingI--) {
+            ToppingType topping = slices.items[sliceI].toppings.items[toppingI].type;
+            if (topping == order.requested_toppings.items[ruleI].type && !seenTarget && i > 2) {
+              score++;
+              slices.items[sliceI].toppings.items[toppingI] = slices.items[sliceI].toppings.items[slices.items[sliceI].toppings.count - 1];
+              slices.items[sliceI].toppings.count--;
+              seenTarget = true;
+            } 
+          }
+        }
+        break;
+      }
+    }
+  }
+  printf("Score: %f.\n", score);
 }
 
 float ptrRotation = 0;
@@ -480,15 +617,15 @@ static void UpdateDrawFrame(void)
     DrawTexture(backgroundTex, 0, 0, WHITE);
 
 
-    DrawTexture(tossButtonImg, 5, 971, WHITE);
-    DrawTexture(serverButtonImg, 5, 865, WHITE);
-    DrawTexture(tossButtonImg, 1724, 971, WHITE);
-    DrawTexture(serverButtonImg, 1724, 865, WHITE);
+    DrawTexture(tossButtonImg, 105, 977, WHITE);
+    DrawTexture(serverButtonImg, 21, 977, WHITE);
+    DrawTexture(tossButtonImg, 1829, 977, WHITE);
+    DrawTexture(serverButtonImg, 1745, 977, WHITE);
 
-    Rectangle leftTossButton = {5, 971, 191, 104};
-    Rectangle rightTossButton = {1724, 971, 191, 104};
-    Rectangle leftServeButton = {5, 865, 191, 104};
-    Rectangle rightServeButton = {1724, 865, 191, 104};
+    Rectangle leftTossButton = {105, 977, 78, 78};
+    Rectangle rightTossButton = {1829, 977, 78, 78};
+    Rectangle leftServeButton = {21, 977, 78, 78};
+    Rectangle rightServeButton = {1745, 977, 78, 78};
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftTossButton)) {
       if (rotators[0].active) {
@@ -505,24 +642,46 @@ static void UpdateDrawFrame(void)
     }
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftServeButton)) {
       if (rotators[0].active) {
-        rotators[0].spinning = false;
-        rotators[0].active = false;
+        
+
+        //rotators[0].spinning = false;
+        //rotators[0].active = false;
         orders.items[rotators[0].order_index].completed = true;
         orders.items[rotators[0].order_index].deliver_time = time;
         orders.active -= 1;
         pizzas.items[rotators[0].pizza_index].delivered = true;
         // calculate and add to score
+        GetScore(pizzas.items[0], orders.items[0]);
+        pizzas.items[0] = (Pizza){
+        .number_of_slices = 6,
+        .order_index = orders.count,
+        .rotation = 0,
+        .position = rotators[0].position,
+        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .toppings = {0}, 
+        .delivered = false,
+      };
       }
     }
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightServeButton)) {
       if (rotators[1].active) {
-        rotators[1].spinning = false;
-        rotators[1].active = false;
+        //rotators[1].spinning = false;
+        //rotators[1].active = false;
         orders.items[rotators[1].order_index].completed = true;
         orders.items[rotators[1].order_index].deliver_time = time;
         orders.active -= 1;
         pizzas.items[rotators[1].pizza_index].delivered = true;
         // calculate and add to score
+        GetScore(pizzas.items[1], orders.items[1]);
+        pizzas.items[1] = (Pizza){
+        .number_of_slices = 6,
+        .order_index = orders.count,
+        .rotation = 0,
+        .position = rotators[1].position,
+        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .toppings = {0}, 
+        .delivered = false,
+      };
       }
     }
 
@@ -538,7 +697,7 @@ static void UpdateDrawFrame(void)
 
     DrawTexture(foregroundConveyorImg, 0, 0, WHITE);
     DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
-
+    DrawText("15322", 852, 619, 70, YELLOW);
     // Flag
 
 
