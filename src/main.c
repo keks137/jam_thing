@@ -456,9 +456,9 @@ static void UpdateDrawFrame(void)
     for (size_t i = 0; i < conveyor_belt.count; i++) {
       ConveyorBeltIngredient ingredient = conveyor_belt.items[i];
       if (
-        mouse_pos.x < ingredient.position.x + toppingsTex[ingredient.type].width * INGREDIENT_SCALE 
+        mouse_pos.x < ingredient.position.x + toppingsTex[ingredient.type].width * INGREDIENT_SCALE * 1.2
         && mouse_pos.x > ingredient.position.x 
-        && mouse_pos.y < ingredient.position.y + toppingsTex[ingredient.type].height * INGREDIENT_SCALE 
+        && mouse_pos.y < ingredient.position.y + toppingsTex[ingredient.type].height * INGREDIENT_SCALE * 1.2
         && mouse_pos.y > conveyor_belt.items[i].position.y 
         && (mouse_pos.x < 805 || mouse_pos.x > 1115)
         && mouse_pos.x > 135
