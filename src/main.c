@@ -764,11 +764,6 @@ static void UpdateDrawFrame(void)
       );
     }
 
-    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-      if (rotators[i].active)
-        DrawCircleSectorLines((Vector2){rotators[i].position.x, rotators[i].position.y}, PIZZA_RADIUS, 270-180/pizzas.items[rotators[i].pizza_index].number_of_slices, 270+180/pizzas.items[rotators[i].pizza_index].number_of_slices, 100, YELLOW);
-    }
-
     if (topping_selected != TOPPING_NONE) {
       Texture2D toppingTexture = toppingsTex[(assert(topping_selected != TOPPING_NONE), topping_selected)];
       float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
@@ -799,7 +794,6 @@ static void UpdateDrawFrame(void)
 		    (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
 		    (Vector2){ 40, robotArmRight.height / 2.0f}, 
 		    right_arm_rot , WHITE);
-    DrawText(TextFormat("%f %f",mouse_pos.x, mouse_pos.y),0,0,30,YELLOW);
     }
   } EndDrawing();
 }
