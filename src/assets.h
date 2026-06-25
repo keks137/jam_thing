@@ -16,6 +16,7 @@
 #define GAME_TIME_POINTER ASSETS_DIR "game-time-pointer.png"
 
 #define PIZZA_BASE_IMG ASSETS_DIR "pizza.png"
+#define PIZZA_MASK_IMG ASSETS_DIR "pizza-mask.png"
 
 #define PEPPERONI_IMG ASSETS_DIR    "pepperoni.png"
 #define MUSHROOM_IMG ASSETS_DIR     "mushroom.png"

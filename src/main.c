@@ -25,6 +25,7 @@
 #define EARLY_PHASE_TIME 120
 #define MIDDLE_PHASE_TIME 120
 #define END_PHASE_TIME 120
+#define TOTAL_GAME_TIME 360
 #define FPS 60
 typedef enum {
   EARLY_PHASE,
@@ -165,6 +166,7 @@ Texture2D backgroundTex;
 Texture2D speedControllerTex;
 
 Texture2D pizzaBaseTex;
+Texture2D pizzaMaskTex;
 
 #define INGREDIENT_SCALE 0.3
 Texture2D toppingsTex[__topping_type_count];
@@ -216,6 +218,7 @@ int main()
   conveyor_belt.speed = EARLY_PHASE_CONVEYOR_BELT_SPEED;
 
   pizzaBaseTex = LoadTexture(PIZZA_BASE_IMG);
+  pizzaMaskTex = LoadTexture(PIZZA_MASK_IMG);
 
   toppingsTex[TOPPING_MUSHROOM] = LoadTexture(MUSHROOM_IMG);
   toppingsTex[TOPPING_OLIVE] = LoadTexture(OLIVE_IMG);
@@ -287,7 +290,7 @@ typedef struct {
 } Slices;
 
 
-float ptrRotation = 0;
+float ptrRotation = -117; // 113;
 
 static void UpdateDrawFrame(void)
 {
@@ -312,7 +315,7 @@ static void UpdateDrawFrame(void)
       }
 
     } break;
-    case END_PHASE: {
+    case END_PHASE: { 
       if (time - start_time >= MIDDLE_PHASE) {
         max_active_orders = 0;
         game_phase = RESULTS_DISPLAY;
@@ -349,20 +352,22 @@ static void UpdateDrawFrame(void)
       Topping topping = {0};
       switch (game_phase) {
         case EARLY_PHASE: {
-          if (prob < 990) {
+          if (prob < 500) {
             topping.requested_position = TOPPING_POSITION_FULL;
-          } else {
+          } else if (prob < 750) {
             topping.requested_position = TOPPING_POSITION_HALF1;
+          } else {
+            topping.requested_position = TOPPING_POSITION_HALF2;
           }
         } break;
         case MIDDLE_PHASE: {
-          if (prob < 400) {
+          if (prob < 200) {
             topping.requested_position = TOPPING_POSITION_FULL;
-          } else if (prob < 600) {
+          } else if (prob < 550) {
             topping.requested_position = TOPPING_POSITION_HALF1;
-          } else if (prob < 800) {
+          } else if (prob < 700) {
             topping.requested_position = TOPPING_POSITION_HALF2;
-          } else if (prob < 900) {
+          } else if (prob < 850) {
             topping.requested_position = TOPPING_POSITION_ALTERNATE1;
           } else {
             topping.requested_position = TOPPING_POSITION_ALTERNATE2;
@@ -466,6 +471,7 @@ static void UpdateDrawFrame(void)
       }
     }
   }
+  
 
   if (topping_selected != TOPPING_NONE && IsMouseButtonUp(MOUSE_BUTTON_LEFT)) {
     for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
@@ -496,7 +502,7 @@ static void UpdateDrawFrame(void)
     topping_selected = TOPPING_NONE;
   }
 
-  ptrRotation++;
+  ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
 
 	BeginDrawing(); {
     ClearBackground(WHITE);
@@ -573,7 +579,7 @@ static void UpdateDrawFrame(void)
     DrawTexture(foregroundBelt, 0, 0, WHITE);
 
     DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
-    DrawText("15322", 852, 619, 70, YELLOW);
+    //DrawText("15322", 852, 619, 70, YELLOW);
     
 
     
@@ -586,8 +592,8 @@ static void UpdateDrawFrame(void)
     float maxSpeed = minSpeed * 4;
 
 
-    int leftY = topY + ((rotators[0].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
-    int rightY = topY + ((rotators[1].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
+    int leftY = topY + (1.0f - (rotators[0].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
+    int rightY = topY + (1.0f - (rotators[1].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
     //DrawTexture(speedControllerTex, 845, leftY, WHITE);
     //DrawTexture(speedControllerTex, 1030, rightY, WHITE);
     DrawTexture(speedControllerTex, 826, leftY, WHITE);
@@ -607,7 +613,7 @@ static void UpdateDrawFrame(void)
     }
     if (draggingLeftCtrl) {
       if (rotators[0].active && rotators[0].spinning) {
-        rotators[0].rotation_speed = ((float)(((mouse_pos.y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
+        rotators[0].rotation_speed = ((float)(1.0f - ((mouse_pos.y - 19 * 4) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
         rotators[0].rotation_speed = minSpeed + maxSpeed * (round(((rotators[0].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
         rotators[0].rotation_speed = (((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) : maxSpeed;
 
@@ -619,7 +625,7 @@ static void UpdateDrawFrame(void)
     if (draggingRightCtrl) {
       if (rotators[1].active && rotators[1].spinning) {
        
-        rotators[1].rotation_speed = ((float)(((mouse_pos.y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
+        rotators[1].rotation_speed = ((float)(1.0f - ((mouse_pos.y - 19 * 4) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
         rotators[1].rotation_speed = minSpeed + maxSpeed * (round(((rotators[1].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
         rotators[1].rotation_speed = (((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) : maxSpeed;
 
@@ -675,7 +681,29 @@ static void UpdateDrawFrame(void)
         pizzas.items[i].rotation * RAD2DEG,
         WHITE
       );
+      DrawTexturePro(
+        pizzaMaskTex,
+        (Rectangle){
+          0,
+          0,
+          pizzas.items[i].render_tex.texture.width,
+          -pizzas.items[i].render_tex.texture.height
+        },
+        (Rectangle){
+          pizzas.items[i].position.x,
+          pizzas.items[i].position.y,
+          pizzas.items[i].render_tex.texture.width,
+          pizzas.items[i].render_tex.texture.height
+        },
+        (Vector2){
+            pizzas.items[i].render_tex.texture.width/2.0f,
+            pizzas.items[i].render_tex.texture.height/2.0f
+        },
+        180,
+        WHITE
+      );
     }
+
 
     for (size_t i = 0; i < ARRAY_LEN(orderTickets); i++) {
       BeginTextureMode(orderTickets[i].render_tex); {
