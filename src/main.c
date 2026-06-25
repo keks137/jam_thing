@@ -404,6 +404,7 @@ static void UpdateDrawFrame(void)
   if (conveyor_belt.count == 0 || da_last(&conveyor_belt).position.x + toppingsTex[da_last(&conveyor_belt).type].width/2 > CONVEYOR_BELT_INGREDIENT_GAP) {
     Toppings required_toppings = {0};
     for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
+      if (!rotators[i].active) continue;
       for (size_t j = 0; j < orders.items[rotators[i].order_index].requested_toppings.count; j++){
         da_append(&required_toppings, ((Topping){.type = orders.items[rotators[i].order_index].requested_toppings.items[j].type}));
 
@@ -489,56 +490,40 @@ static void UpdateDrawFrame(void)
     Rectangle leftServeButton = {5, 865, 191, 104};
     Rectangle rightServeButton = {1724, 865, 191, 104};
 
-    if (IsMouseButtonPressed(0) && CheckCollisionPointRec(mouse_pos, leftTossButton)) {
-        pizzas.items[0] = (Pizza){
-        .number_of_slices = 6,
-        .order_index = orders.count,
-        .rotation = 0,
-        .position = rotators[0].position,
-        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
-        .toppings = {0}, 
-        .delivered = false,
-      };
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftTossButton)) {
+      if (rotators[0].active) {
+        pizzas.items[rotators[0].pizza_index].rotation = 0;
+        pizzas.items[rotators[0].pizza_index].toppings.count = 0;
+      }
     }
 
-    if (IsMouseButtonPressed(0) && CheckCollisionPointRec(mouse_pos, rightTossButton)) {
-        pizzas.items[1] = (Pizza){
-        .number_of_slices = 6,
-        .order_index = orders.count,
-        .rotation = 0,
-        .position = rotators[1].position,
-        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
-        .toppings = {0}, 
-        .delivered = false,
-      };
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightTossButton)) {
+      if (rotators[1].active) {
+        pizzas.items[rotators[1].pizza_index].rotation = 0;
+        pizzas.items[rotators[1].pizza_index].toppings.count = 0;
+      }
     }
-    if (IsMouseButtonPressed(0) && CheckCollisionPointRec(mouse_pos, leftServeButton)) {
-
-        // Change later to score based on orders.
-
-        pizzas.items[0] = (Pizza){
-        .number_of_slices = 6,
-        .order_index = orders.count,
-        .rotation = 0,
-        .position = rotators[0].position,
-        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
-        .toppings = {0}, 
-        .delivered = false,
-      };
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftServeButton)) {
+      if (rotators[0].active) {
+        rotators[0].spinning = false;
+        rotators[0].active = false;
+        orders.items[rotators[0].order_index].completed = true;
+        orders.items[rotators[0].order_index].deliver_time = time;
+        orders.active -= 1;
+        pizzas.items[rotators[0].pizza_index].delivered = true;
+        // calculate and add to score
+      }
     }
-    if (IsMouseButtonPressed(0) && CheckCollisionPointRec(mouse_pos, rightServeButton)) {
-
-        // Change later to score based on orders.
-
-        pizzas.items[1] = (Pizza){
-        .number_of_slices = 6,
-        .order_index = orders.count,
-        .rotation = 0,
-        .position = rotators[1].position,
-        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
-        .toppings = {0}, 
-        .delivered = false,
-      };
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightServeButton)) {
+      if (rotators[1].active) {
+        rotators[1].spinning = false;
+        rotators[1].active = false;
+        orders.items[rotators[1].order_index].completed = true;
+        orders.items[rotators[1].order_index].deliver_time = time;
+        orders.active -= 1;
+        pizzas.items[rotators[1].pizza_index].delivered = true;
+        // calculate and add to score
+      }
     }
 
     // Conveyor belt
@@ -546,7 +531,6 @@ static void UpdateDrawFrame(void)
       Texture2D toppingTexture = toppingsTex[conveyor_belt.items[i].type];
       float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
       float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
-      // Rectangle targetRect = {mouse_pos.x - targetWidth / 2, mouse_pos.y - targetHeight / 2, targetWidth, targetHeight};
       Rectangle targetRect = {conveyor_belt.items[i].position.x, conveyor_belt.items[i].position.y, targetWidth, targetHeight};
       DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height}, targetRect, (Vector2){0,0}, 0, WHITE);
       
@@ -587,24 +571,27 @@ static void UpdateDrawFrame(void)
       
     }
     if (draggingLeftCtrl) {
-      
-      rotators[0].rotation_speed = ((float)(((mouse_pos.y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
-      rotators[0].rotation_speed = minSpeed + maxSpeed * (round(((rotators[0].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
-      rotators[0].rotation_speed = (((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) : maxSpeed;
+      if (rotators[0].active && rotators[0].spinning) {
+        rotators[0].rotation_speed = ((float)(((mouse_pos.y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
+        rotators[0].rotation_speed = minSpeed + maxSpeed * (round(((rotators[0].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
+        rotators[0].rotation_speed = (((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) : maxSpeed;
 
-      if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-        draggingLeftCtrl = false;
+        if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+          draggingLeftCtrl = false;
+        }
       }
     } 
     if (draggingRightCtrl) {
-      DrawRectangle(10,10, 30, 30, BLUE);
-      rotators[1].rotation_speed = ((float)(((mouse_pos.y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
-      rotators[1].rotation_speed = minSpeed + maxSpeed * (round(((rotators[1].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
-      rotators[1].rotation_speed = (((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) : maxSpeed;
+      if (rotators[1].active && rotators[1].spinning) {
+        DrawRectangle(10,10, 30, 30, BLUE);
+        rotators[1].rotation_speed = ((float)(((mouse_pos.y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
+        rotators[1].rotation_speed = minSpeed + maxSpeed * (round(((rotators[1].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
+        rotators[1].rotation_speed = (((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) : maxSpeed;
 
-      
-      if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-        draggingRightCtrl = false;
+        
+        if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+          draggingRightCtrl = false;
+        }
       }
     }
 
