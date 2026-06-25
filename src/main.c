@@ -174,7 +174,11 @@ Texture2D toppingPositionIconsTex[__topping_position_count];
 Texture2D tossButtonImg;
 Texture2D serverButtonImg;
 
-Texture2D foregroundConveyorImg;
+Texture2D foregroundBelt;
+Texture2D conveyorBeltFrames[3];
+int currentBeltFrame = 0;
+float beltTimer = 0;
+
 Texture2D gameTimePointer;
 
 Texture2D blankOrderTicketTex;
@@ -197,6 +201,11 @@ int main()
   backgroundTex = LoadTexture(BACKGROUND_IMG);
   speedControllerTex = LoadTexture(SPEED_CONTROLLER_IMG);
   blankOrderTicketTex = LoadTexture(ORDER_TICKET_BLANK_IMG);
+
+  foregroundBelt = LoadTexture(BELT_FOREGROUND);
+  conveyorBeltFrames[0] = LoadTexture(BELT_FRAME_1);
+  conveyorBeltFrames[1] = LoadTexture(BELT_FRAME_2);
+  conveyorBeltFrames[2] = LoadTexture(BELT_FRAME_3);
 
   orderTickets[0].render_tex = LoadRenderTexture(blankOrderTicketTex.width, blankOrderTicketTex.height);
   orderTickets[0].position = (Vector2){.x = 12, .y = 520};
@@ -224,7 +233,6 @@ int main()
   tossButtonImg = LoadTexture(TOSS_BUTTON_IMG);
   serverButtonImg = LoadTexture(SERVER_BUTTON_IMG);
 
-  foregroundConveyorImg = LoadTexture(FOREGROUND_CONVEYOR_BELT);
   gameTimePointer = LoadTexture(GAME_TIME_POINTER);
 
   for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
@@ -614,7 +622,16 @@ static void UpdateDrawFrame(void)
 
 	BeginDrawing(); {
     ClearBackground(WHITE);
+    
+ 
     DrawTexture(backgroundTex, 0, 0, WHITE);
+
+    beltTimer += dt;
+    if (beltTimer >= 1.0f/6.0f) {
+      beltTimer = 0;
+      currentBeltFrame = (currentBeltFrame + 1) % 3;
+    }
+    DrawTexture(conveyorBeltFrames[currentBeltFrame], 0, 30, WHITE);
 
 
     DrawTexture(tossButtonImg, 105, 977, WHITE);
@@ -695,18 +712,18 @@ static void UpdateDrawFrame(void)
       
     }
 
-    DrawTexture(foregroundConveyorImg, 0, 0, WHITE);
+    DrawTexture(foregroundBelt, 0, 0, WHITE);
+
     DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
     DrawText("15322", 852, 619, 70, YELLOW);
-    // Flag
+    
 
-
- 
+    
 
     // RPM controller
 
-    int topY =  817;
-    int bottomY = 1025;
+    int topY =  840;
+    int bottomY = 1010;
     float minSpeed = 31.415 * (PI / 180);
     float maxSpeed = minSpeed * 4;
 
@@ -715,17 +732,18 @@ static void UpdateDrawFrame(void)
     int rightY = topY + ((rotators[1].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
     //DrawTexture(speedControllerTex, 845, leftY, WHITE);
     //DrawTexture(speedControllerTex, 1030, rightY, WHITE);
-    DrawTexture(speedControllerTex, 845, leftY, WHITE);
-    DrawTexture(speedControllerTex, 1030, rightY, WHITE);
+    DrawTexture(speedControllerTex, 826, leftY, WHITE);
+    DrawTexture(speedControllerTex, 1018, rightY, WHITE);
 
+    
 
     bool openToDrag = topping_selected == TOPPING_NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
     
-    if (CheckCollisionPointRec(mouse_pos, (Rectangle){845.0f, (float)leftY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl) {
+    if (CheckCollisionPointRec(mouse_pos, (Rectangle){826.0f, (float)leftY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl) {
       draggingLeftCtrl = true;
       
     }
-    if (CheckCollisionPointRec(mouse_pos, (Rectangle){1030.0f, (float)rightY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl) {
+    if (CheckCollisionPointRec(mouse_pos, (Rectangle){1018.0f, (float)rightY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl) {
       draggingRightCtrl = true;
       
     }
@@ -742,7 +760,7 @@ static void UpdateDrawFrame(void)
     } 
     if (draggingRightCtrl) {
       if (rotators[1].active && rotators[1].spinning) {
-        DrawRectangle(10,10, 30, 30, BLUE);
+       
         rotators[1].rotation_speed = ((float)(((mouse_pos.y - 19) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
         rotators[1].rotation_speed = minSpeed + maxSpeed * (round(((rotators[1].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
         rotators[1].rotation_speed = (((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) : maxSpeed;

@@ -8,7 +8,10 @@
 
 #define SPEED_CONTROLLER_IMG ASSETS_DIR "speed-control-slider.png"
 
-#define FOREGROUND_CONVEYOR_BELT ASSETS_DIR "foreground-conveyor-belt.png"
+#define BELT_FRAME_1 ASSETS_DIR "conveyor-belt-1.png"
+#define BELT_FRAME_2 ASSETS_DIR "conveyor-belt-2.png"
+#define BELT_FRAME_3 ASSETS_DIR "conveyor-belt-3.png"
+#define BELT_FOREGROUND ASSETS_DIR "foreground-conveyor-belt.png"
 
 #define GAME_TIME_POINTER ASSETS_DIR "game-time-pointer.png"
 
