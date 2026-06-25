@@ -43,6 +43,7 @@ typedef enum {
   TOPPING_CORN,
   TOPPING_FETA,
   TOPPING_SPINACH,
+  __topping_type_count
 } ToppingType;
 
 typedef enum {
@@ -52,6 +53,7 @@ typedef enum {
   TOPPING_POSITION_HALF2,
   TOPPING_POSITION_ALTERNATE1,
   TOPPING_POSITION_ALTERNATE2,
+  __topping_position_count
 } ToppingPosition;
 
 typedef struct {
@@ -129,7 +131,7 @@ typedef struct {
 #define MIDDLE_PHASE_CONVEYOR_BELT_SPEED 5
 #define END_PHASE_CONVEYOR_BELT_SPEED 7
 
-#define CONVEYOR_BELT_INGREDIENT_GAP 100
+#define CONVEYOR_BELT_INGREDIENT_GAP 600
 
 typedef struct {
   ConveyorBeltIngredient* items;
@@ -160,12 +162,12 @@ size_t max_toppings_per_pizza = 2;
 Texture2D backgroundTex;
 Texture2D speedControllerTex;
 
-Texture2D pizzaBaseImg;
+Texture2D pizzaBaseTex;
 
-#define INGREDIENT_SCALE 0.3;
-Texture2D mushroomImg;
-Texture2D oliveImg;
-Texture2D pepperoniImg;
+#define INGREDIENT_SCALE 0.3
+Texture2D toppingsTex[__topping_type_count];
+
+Texture2D toppingPositionIconsTex[__topping_position_count];
 
 Texture2D tossButtonImg;
 Texture2D serverButtonImg;
@@ -188,28 +190,36 @@ int main()
 
   backgroundTex = LoadTexture(BACKGROUND_IMG);
   speedControllerTex = LoadTexture(SPEED_CONTROLLER_IMG);
-  blankOrderTicketTex = LoadTexture(ORDER_TICKET_BLANKIMG);
+  blankOrderTicketTex = LoadTexture(ORDER_TICKET_BLANK_IMG);
 
   orderTickets[0].render_tex = LoadRenderTexture(blankOrderTicketTex.width, blankOrderTicketTex.height);
-  orderTickets[0].position = (Vector2){.x = 25, .y = 600};
+  orderTickets[0].position = (Vector2){.x = 10, .y = 300};
   orderTickets[1].render_tex = LoadRenderTexture(blankOrderTicketTex.width, blankOrderTicketTex.height);
-  orderTickets[1].position = (Vector2){.x = SCREEN_WIDTH - blankOrderTicketTex.width, .y = 600};
+  orderTickets[1].position = (Vector2){.x = SCREEN_WIDTH - blankOrderTicketTex.width - 10, .y = 300};
 
   conveyor_belt.speed = EARLY_PHASE_CONVEYOR_BELT_SPEED;
 
-  pizzaBaseImg = LoadTexture(PIZZA_BASE_IMG);
-  mushroomImg = LoadTexture(MUSHROOM_IMG);
-  oliveImg = LoadTexture(OLIVE_IMG);
-  pepperoniImg = LoadTexture(PEPPERONI_IMG);
+  pizzaBaseTex = LoadTexture(PIZZA_BASE_IMG);
+
+  toppingsTex[TOPPING_MUSHROOM] = LoadTexture(MUSHROOM_IMG);
+  toppingsTex[TOPPING_OLIVE] = LoadTexture(OLIVE_IMG);
+  toppingsTex[TOPPING_PEPPERONI] = LoadTexture(PEPPERONI_IMG);
+  toppingsTex[TOPPING_BELL_PEPPER] = LoadTexture(BELL_PEPPER_IMG);
+  toppingsTex[TOPPING_CORN] = LoadTexture(CORN_IMG);
+  toppingsTex[TOPPING_FETA] = LoadTexture(FETA_IMG);
+  toppingsTex[TOPPING_SPINACH] = LoadTexture(SPINACH_IMG);
+
+  toppingPositionIconsTex[TOPPING_POSITION_FULL] = LoadTexture(PIZZA_ICON_FULL_IMG);
+  toppingPositionIconsTex[TOPPING_POSITION_HALF1] = LoadTexture(PIZZA_ICON_TOP_IMG);
+  toppingPositionIconsTex[TOPPING_POSITION_HALF2] = LoadTexture(PIZZA_ICON_BOTTOM_IMG);
+  toppingPositionIconsTex[TOPPING_POSITION_ALTERNATE1] = LoadTexture(PIZZA_ICON_ALTERNATING_1_IMG);
+  toppingPositionIconsTex[TOPPING_POSITION_ALTERNATE2] = LoadTexture(PIZZA_ICON_ALTERNATING_2_IMG);
 
   tossButtonImg = LoadTexture(TOSS_BUTTON_IMG);
   serverButtonImg = LoadTexture(SERVER_BUTTON_IMG);
 
   foregroundConveyorImg = LoadTexture(FOREGROUND_CONVEYOR_BELT);
   gameTimePointer = LoadTexture(GAME_TIME_POINTER);
-
-
-
 
   for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
     rotators[i].rotation_speed = PIZZA_BASE_ROTATION_SPEED;
@@ -384,9 +394,8 @@ static void UpdateDrawFrame(void)
       conveyor_belt.count -= 1;
     }
   }
-  // TODO: use actual ingredient size
-  assert(false && "TODO");
-  if (conveyor_belt.count == 0 || da_last(&conveyor_belt).position.x > CONVEYOR_BELT_INGREDIENT_GAP) {
+
+  if (conveyor_belt.count == 0 || da_last(&conveyor_belt).position.x + toppingsTex[da_last(&conveyor_belt).type].width/2 > CONVEYOR_BELT_INGREDIENT_GAP) {
     Toppings required_toppings = {0};
     for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
       for (size_t j = 0; j < orders.items[rotators[i].order_index].requested_toppings.count; j++){
@@ -395,11 +404,9 @@ static void UpdateDrawFrame(void)
       }
     }
     int required_toppings_index = rand() % required_toppings.count;
-    assert(false && "TODO");
     da_append(&conveyor_belt, ((ConveyorBeltIngredient){
       .type = required_toppings.items[required_toppings_index].type,
-    // TODO: use correct middle y of conveyor belt
-      .position = {.x = 0, .y = 40},
+      .position = {.x = 0, .y = 120 - toppingsTex[required_toppings.items[required_toppings_index].type].height/2 * INGREDIENT_SCALE},
     }));
 
     da_free(required_toppings);
@@ -413,9 +420,16 @@ static void UpdateDrawFrame(void)
 
   if (topping_selected == TOPPING_NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
     for (size_t i = 0; i < conveyor_belt.count; i++) {
-      assert(false && "TODO");
-      // TODO: use actual ingredient pixel size for comparing mouse position with ingredient position
-      if (mouse_pos.x < conveyor_belt.items[i].position.x + 18 && mouse_pos.x > conveyor_belt.items[i].position.x && mouse_pos.y < conveyor_belt.items[i].position.y + 18 && mouse_pos.y > conveyor_belt.items[i].position.y) {
+      ConveyorBeltIngredient ingredient = conveyor_belt.items[i];
+      if (
+        mouse_pos.x < ingredient.position.x + toppingsTex[ingredient.type].width * INGREDIENT_SCALE 
+        && mouse_pos.x > ingredient.position.x 
+        && mouse_pos.y < ingredient.position.y + toppingsTex[ingredient.type].height * INGREDIENT_SCALE 
+        && mouse_pos.y > conveyor_belt.items[i].position.y 
+        && (mouse_pos.x < 805 || mouse_pos.x > 1115)
+        && mouse_pos.x > 135
+        && mouse_pos.x < 1920 - 135
+      ) {
         topping_selected = conveyor_belt.items[i].type;
         conveyor_belt.items[i].type = TOPPING_NONE;
         break;
@@ -425,7 +439,7 @@ static void UpdateDrawFrame(void)
 
   if (topping_selected != TOPPING_NONE && IsMouseButtonUp(MOUSE_BUTTON_LEFT)) {
     for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-      if (!rotators[i].active && rotators[i].spinning) continue;
+      if (!rotators[i].active && !rotators[i].spinning) continue;
       if (!CheckCollisionPointCircle(mouse_pos, rotators[i].position, PIZZA_RADIUS)) continue;
       Vector2 triangle_verts[3] = {
         rotators[i].position,
@@ -452,13 +466,12 @@ static void UpdateDrawFrame(void)
     topping_selected = TOPPING_NONE;
   }
 
+  ptrRotation++;
+
 	BeginDrawing(); {
     ClearBackground(WHITE);
     DrawTexture(backgroundTex, 0, 0, WHITE);
 
-    DrawTexture(foregroundConveyorImg, 0, 0, WHITE);
-    DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
-    ptrRotation++;
 
     DrawTexture(tossButtonImg, 5, 971, WHITE);
     DrawTexture(serverButtonImg, 5, 865, WHITE);
@@ -476,7 +489,7 @@ static void UpdateDrawFrame(void)
         .order_index = orders.count,
         .rotation = 0,
         .position = rotators[0].position,
-        .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
         .toppings = {0}, 
         .delivered = false,
       };
@@ -488,7 +501,7 @@ static void UpdateDrawFrame(void)
         .order_index = orders.count,
         .rotation = 0,
         .position = rotators[1].position,
-        .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
         .toppings = {0}, 
         .delivered = false,
       };
@@ -502,7 +515,7 @@ static void UpdateDrawFrame(void)
         .order_index = orders.count,
         .rotation = 0,
         .position = rotators[0].position,
-        .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
         .toppings = {0}, 
         .delivered = false,
       };
@@ -516,7 +529,7 @@ static void UpdateDrawFrame(void)
         .order_index = orders.count,
         .rotation = 0,
         .position = rotators[1].position,
-        .tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
         .toppings = {0}, 
         .delivered = false,
       };
@@ -524,22 +537,17 @@ static void UpdateDrawFrame(void)
 
     // Conveyor belt
     for (size_t i = 0; i < conveyor_belt.count; i++) {
-      // TODO: use actual textures for drawing the ingrediets
-      Color topping_color = BLANK;
-      switch (conveyor_belt.items[i].type) {
-        case TOPPING_NONE: break;
-        case TOPPING_MUSHROOM: topping_color = BEIGE; break;
-        case TOPPING_OLIVE: topping_color = DARKGREEN; break;
-        case TOPPING_PEPPERONI: topping_color = MAROON; break;
-        case TOPPING_BELL_PEPPER: assert(false && "TODO"); break;
-        case TOPPING_CORN: assert(false && "TODO"); break;
-        case TOPPING_FETA: assert(false && "TODO"); break;
-        case TOPPING_SPINACH: assert(false && "TODO"); break;
-        default: assert(false && "unknown topping to render");
-      }
-      DrawRectangle(conveyor_belt.items[i].position.x-18/2, conveyor_belt.items[i].position.y-18/2, 18, 18, topping_color);
-      DrawRectangleLines(conveyor_belt.items[i].position.x-18/2, conveyor_belt.items[i].position.y-18/2, 18, 18, BLACK);
+      Texture2D toppingTexture = toppingsTex[conveyor_belt.items[i].type];
+      float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
+      float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
+      // Rectangle targetRect = {mouse_pos.x - targetWidth / 2, mouse_pos.y - targetHeight / 2, targetWidth, targetHeight};
+      Rectangle targetRect = {conveyor_belt.items[i].position.x, conveyor_belt.items[i].position.y, targetWidth, targetHeight};
+      DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height}, targetRect, (Vector2){0,0}, 0, WHITE);
+      
     }
+
+    DrawTexture(foregroundConveyorImg, 0, 0, WHITE);
+    DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
 
     // Flag
 
@@ -599,21 +607,13 @@ static void UpdateDrawFrame(void)
       BeginTextureMode(pizzas.items[i].render_tex); {
         ClearBackground(BLANK);
 
-        //DrawCircle(PIZZA_RADIUS, PIZZA_RADIUS, PIZZA_RADIUS, RED);
-        DrawTexture(pizzaBaseImg, 0, 0, WHITE);
+        DrawTexture(pizzaBaseTex, 0, 0, WHITE);
         for (size_t j = 1; j <= pizzas.items[i].number_of_slices; j++) {
           DrawLine(PIZZA_RADIUS, PIZZA_RADIUS, PIZZA_RADIUS + PIZZA_RADIUS * cosf(j*2*PI/pizzas.items[i].number_of_slices), PIZZA_RADIUS + PIZZA_RADIUS * sinf(j*2*PI/pizzas.items[i].number_of_slices), BLACK);
         }
 
          for (size_t j = 0; j < pizzas.items[i].toppings.count; j++) {
-          Texture2D toppingTexture;
-          switch (pizzas.items[i].toppings.items[j].type) {
-            case TOPPING_NONE: break;
-            case TOPPING_MUSHROOM: toppingTexture = mushroomImg; break;
-            case TOPPING_OLIVE: toppingTexture = oliveImg; break;
-            case TOPPING_PEPPERONI: toppingTexture = pepperoniImg; break;
-            default: assert(false && "unknown topping to render");
-          }
+          Texture2D toppingTexture = toppingsTex[(assert(pizzas.items[i].toppings.items[j].type != TOPPING_NONE), pizzas.items[i].toppings.items[j].type)];
           float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
           float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
           Rectangle rec = {
@@ -715,24 +715,16 @@ static void UpdateDrawFrame(void)
     }
 
     for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-      DrawCircleSectorLines((Vector2){rotators[i].position.x, rotators[i].position.y}, PIZZA_RADIUS, 270-180/pizzas.items[rotators[i].pizza_index].number_of_slices, 270+180/pizzas.items[rotators[i].pizza_index].number_of_slices, 100, YELLOW);
+      if (rotators[i].active)
+        DrawCircleSectorLines((Vector2){rotators[i].position.x, rotators[i].position.y}, PIZZA_RADIUS, 270-180/pizzas.items[rotators[i].pizza_index].number_of_slices, 270+180/pizzas.items[rotators[i].pizza_index].number_of_slices, 100, YELLOW);
     }
 
     if (topping_selected != TOPPING_NONE) {
-      Texture2D toppingTexture;
-      switch (topping_selected) {
-        case TOPPING_NONE: break;
-        case TOPPING_MUSHROOM: toppingTexture = mushroomImg; break;
-        case TOPPING_OLIVE: toppingTexture = oliveImg; break;
-        case TOPPING_PEPPERONI: toppingTexture = pepperoniImg; break;
-        default: assert(false && "unknown topping to render");
-      }
-      //DrawRectangle(mouse_pos.x-18/2, mouse_pos.y-18/2, 18, 18, topping_color);
+      Texture2D toppingTexture = toppingsTex[(assert(topping_selected != TOPPING_NONE), topping_selected)];
       float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
       float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
       Rectangle targetRect = {mouse_pos.x - targetWidth / 2, mouse_pos.y - targetHeight / 2, targetWidth, targetHeight};
       DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height}, targetRect, (Vector2){0,0}, 0, WHITE);
-      
     }
   } EndDrawing();
 }
