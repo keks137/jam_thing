@@ -46,6 +46,8 @@ typedef enum {
   __topping_type_count
 } ToppingType;
 
+#define TOPPING_POSITION_ICON_SCALE 1.5
+
 typedef enum {
   TOPPING_POSITION_NONE,
   TOPPING_POSITION_FULL,
@@ -131,7 +133,7 @@ typedef struct {
 #define MIDDLE_PHASE_CONVEYOR_BELT_SPEED 5
 #define END_PHASE_CONVEYOR_BELT_SPEED 7
 
-#define CONVEYOR_BELT_INGREDIENT_GAP 600
+#define CONVEYOR_BELT_INGREDIENT_GAP 475
 
 typedef struct {
   ConveyorBeltIngredient* items;
@@ -181,12 +183,16 @@ OrderTicket orderTickets[2];
 bool draggingLeftCtrl = false;
 bool draggingRightCtrl = false;
 
+Font summer_font;
+
 static void UpdateDrawFrame(void);
 
 int main()
 {
   srand(time(NULL));
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Spinzza");
+
+  summer_font = LoadFont(SUMMER_FONT);
 
   backgroundTex = LoadTexture(BACKGROUND_IMG);
   speedControllerTex = LoadTexture(SPEED_CONTROLLER_IMG);
@@ -655,42 +661,45 @@ static void UpdateDrawFrame(void)
         if (rotators[i].active) {
           size_t order_index = rotators[i].order_index;
           Order order = orders.items[order_index];
-          Vector2 position = {orderTickets[i].position.x + 5, orderTickets[i].position.y + 100};
+          Vector2 position = {20, 150};
           for (size_t j = 0; j < order.requested_toppings.count; j++) {
-            // TODO: render the ingredient name and the positioning
-            Topping topping = order.requested_toppings.items[i];
-            switch (topping.requested_position) {
-              case TOPPING_POSITION_NONE: assert(false && "topping positioning shouldn't be none inside the order");
-              case TOPPING_POSITION_FULL: {
+            Topping topping = order.requested_toppings.items[j];
+            ToppingPosition topping_position = topping.requested_position;
 
-              } break;
-              case TOPPING_POSITION_HALF1: {
+            DrawTextureEx(
+              toppingPositionIconsTex[(assert(topping_position != TOPPING_POSITION_NONE && topping_position < __topping_position_count && "topping positioning is either none or unkown"), topping_position)],
+              position,
+              0,
+              TOPPING_POSITION_ICON_SCALE,
+              WHITE
+            );
 
-              } break;
-              case TOPPING_POSITION_HALF2: {
-
-              } break;
-              case TOPPING_POSITION_ALTERNATE1: {
-
-              } break;
-              case TOPPING_POSITION_ALTERNATE2: {
-
-              } break;
-              default: assert(false && "unkown topping type in order");
+            Texture2D tex = toppingsTex[(assert(topping.type != TOPPING_NONE && topping.type < __topping_type_count && "topping type is either none or unkown inside order"), topping.type)];
+            float scale = 0.3;
+            switch(topping.type) {
+              case TOPPING_MUSHROOM: scale = 0.25; break;
+              case TOPPING_BELL_PEPPER: scale = 0.2; break;
+              default: break;
             }
-
-            switch (topping.type) {
-              case TOPPING_NONE: assert(false && "topping type shouldn't be none inside the order");
-              case TOPPING_MUSHROOM: {} break;
-              case TOPPING_OLIVE: {} break;
-              case TOPPING_PEPPERONI: {} break;
-              case TOPPING_BELL_PEPPER: {} break;
-              case TOPPING_CORN: {} break;
-              case TOPPING_FETA: {} break;
-              case TOPPING_SPINACH: {} break;
-              default: assert(false && "unkown topping type in order");
-            }
-            position.y += 50;
+            DrawTexturePro(
+              tex,
+              (Rectangle){
+                0,
+                0,
+                tex.width,
+                tex.height
+              },
+              (Rectangle){
+                position.x + 70,
+                position.y,
+                tex.width * scale,
+                tex.height * scale
+              },
+              (Vector2){0, 0},
+              0,
+              WHITE
+            );
+            position.y += 100;
           }
         }
       } EndTextureMode();

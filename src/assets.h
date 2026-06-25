@@ -32,6 +32,7 @@
 #define PIZZA_ICON_FULL_IMG          ASSETS_DIR "pizza-icon-full.png"
 #define PIZZA_ICON_TOP_IMG           ASSETS_DIR "pizza-icon-top.png"
 
+#define SUMMER_FONT ASSETS_DIR "Summer-4nx3W.ttf"
 
 #endif // ASSETS_H_
 
