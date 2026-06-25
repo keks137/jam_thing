@@ -197,7 +197,7 @@ Font summer_font;
 float ptrRotation = -117; // 113
 
 size_t score = 0;
-char* scoreStr = NULL;
+char scoreStr[64];
 
 static void UpdateDrawFrame(void);
 void UpdateScore(Pizza pizza, Order order);
@@ -207,7 +207,7 @@ int main()
   srand(time(NULL));
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Spinzza");
 
-  asprintf(&scoreStr, "0");
+  sprintf(scoreStr, "0");
 
   summer_font = LoadFont(SUMMER_FONT);
 
@@ -1039,8 +1039,5 @@ void UpdateScore(Pizza pizza, Order order) {
     }
   }
 
-  if (scoreStr != NULL) {
-    free(scoreStr);
-  }
-  asprintf(&scoreStr, "%zu", score);
+  sprintf(scoreStr, "%zu", score);
 }
