@@ -21,7 +21,6 @@
 #define SCREEN_WIDTH  1920
 #define SCREEN_HEIGHT 1080
 
-#define GAME_TIME 360
 #define EARLY_PHASE_TIME 120
 #define MIDDLE_PHASE_TIME 120
 #define END_PHASE_TIME 120
@@ -29,6 +28,7 @@
 #define FPS 60
 
 typedef enum {
+  START_SCREEN,
   EARLY_PHASE,
   MIDDLE_PHASE,
   END_PHASE,
@@ -145,6 +145,7 @@ typedef struct {
 
 GamePhase game_phase = EARLY_PHASE;
 float start_time = 0;
+float game_phase_time = 0;
 
 PizzaRotator rotators[2] = {
   {.rotation_speed = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}},
@@ -295,27 +296,28 @@ static void UpdateDrawFrame(void)
   double time = GetTime();
 
   switch (game_phase) {
+    case START_SCREEN: {
+
+    } break;
     case EARLY_PHASE: {
-      if (time - start_time >= EARLY_PHASE_TIME) {
+      if (time - game_phase_time >= EARLY_PHASE_TIME) {
         game_phase = MIDDLE_PHASE;
         max_active_orders = 2;
         conveyor_belt.speed = MIDDLE_PHASE_CONVEYOR_BELT_SPEED;
-        break;
+        game_phase_time = time;
       }
     } break;
     case MIDDLE_PHASE: {
-      if (time  - start_time >= MIDDLE_PHASE_TIME) {
+      if (time  - game_phase_time >= MIDDLE_PHASE_TIME) {
         game_phase = END_PHASE;
         conveyor_belt.speed = END_PHASE_CONVEYOR_BELT_SPEED;
-        break;
+        game_phase_time = time;
       }
-
     } break;
     case END_PHASE: {
-      if (time - start_time >= END_PHASE_TIME) {
+      if (time - game_phase_time >= END_PHASE_TIME) {
         game_phase = RESULTS_DISPLAY;
         max_active_orders = 0;
-        break;
       }
 
     } break;
