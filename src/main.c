@@ -801,8 +801,6 @@ static void UpdateDrawFrame(void)
 }
 
 void UpdateScore(Pizza pizza, Order order) {
-
-  // Toppings toppings_per_slice[pizza.number_of_slices];
   unsigned char toppings_present_on_slice[__topping_type_count];
   for (size_t i = 0; i < __topping_type_count; i++) {
     toppings_present_on_slice[i] = 0;
@@ -834,7 +832,7 @@ void UpdateScore(Pizza pizza, Order order) {
         // check other topping which is requested
         size_t other_order = i == 0 ? 1 : 0;
         if (order.requested_toppings.items[other_order].requested_position == TOPPING_POSITION_HALF2) {
-          if ((toppings_present_on_slice[current_topping.type] & toppings_present_on_slice[other_order]) == 0) {
+          if ((toppings_present_on_slice[current_topping.type] & toppings_present_on_slice[order.requested_toppings.items[other_order].type]) == 0) {
             bool perfect_half = false;
             for (size_t j = 0; j < ARRAY_LEN(half_slice_comparators); j++) {
               if ((half_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == half_slice_comparators[j]) {
