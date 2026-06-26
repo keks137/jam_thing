@@ -238,6 +238,7 @@ void PickupToppingFromConveyorBelt(Vector2 mouse_pos);
 void PlaceToppingOnPizza(Vector2 mouse_pos);
 void TossOrServe(Vector2 mouse_pos, double time);
 void DrawConveyorBelt(float dt);
+void DrawRobotArms(void);
 void UpdateAndDrawSpeedControllers(Vector2 mouse_pos);
 void DrawPizzas(void);
 void DrawOrderTicket(void);
@@ -423,71 +424,7 @@ static void UpdateDrawFrame(void)
 
     DrawPickedUpTopping(mouse_pos);
 
-    {
-      Vector2 left_arm_pos = {820,385};
-      float left_arm_target_rot = 0;
-      if (mouse_pos.x <= left_arm_pos.x) left_arm_target_rot = atan2f(left_arm_pos.y - mouse_pos.y,  left_arm_pos.x - mouse_pos.x ) * RAD2DEG;
-         // DrawText(TextFormat("%f",left_arm_angle),0,0,30,YELLOW);
-      left_arm_target_rot = Clamp(left_arm_target_rot, -90, 90);
-      if (fabsf(left_arm_target_rot - leftArmAngle) > 45) {
-            leftArmAngle = Lerp(leftArmAngle, left_arm_target_rot, 0.1);
-      } else if (left_arm_target_rot != 0) {
-          leftArmAngle = left_arm_target_rot;
-      } else {
-        leftArmAngle = Lerp(leftArmAngle, left_arm_target_rot, 0.05);
-      }
-      
-      float distToCursor = Vector2Length(Vector2Subtract(left_arm_pos, mouse_pos));
-      RenderTexture2D leftArmRenderTex = LoadRenderTexture(distToCursor + 84, 114);
-      if (distToCursor > 297 && mouse_pos.x <= left_arm_pos.x) {
-        BeginTextureMode(leftArmRenderTex);
-        int endOfRod = distToCursor + 84 - 79;
-        DrawTexture(leftArmHead, 0, 0, WHITE);
-        DrawTexturePro(leftArmRod, (Rectangle){0,0,153,114}, (Rectangle){168, 0, endOfRod - 168, 114}, (Vector2){0,0}, 0, WHITE);
-        DrawTexture(leftArmBearing, endOfRod, 0, WHITE);
-        EndTextureMode();
-        robotArmLeft = leftArmRenderTex.texture;
-      }
-
-      DrawTexturePro( robotArmLeft, (Rectangle){0, 0, robotArmLeft.width, robotArmLeft.height},
-        (Rectangle){left_arm_pos.x, left_arm_pos.y, robotArmLeft.width, robotArmLeft.height},
-        (Vector2){robotArmLeft.width - 40, robotArmLeft.height / 2.0f}, 
-        leftArmAngle , WHITE);
-    }
-    {
-      Vector2 right_arm_pos = {1090,385};
-
-      float right_arm_target_rot = 0;
-      if (mouse_pos.x >= right_arm_pos.x) right_arm_target_rot = atan2f( mouse_pos.y - right_arm_pos.y ,   mouse_pos.x - right_arm_pos.x  ) * RAD2DEG;
-         // DrawText(TextFormat("%f",right_arm_angle),0,0,30,YELLOW);
-
-      right_arm_target_rot = Clamp(right_arm_target_rot, -90, 90);
-      if (fabsf(right_arm_target_rot - rightArmAngle) > 45) {
-            rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.1);
-      } else if (right_arm_target_rot != 0) {
-          rightArmAngle = right_arm_target_rot;
-      } else {
-        rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.05);
-      }
-
-      float distToCursor = Vector2Length(Vector2Subtract(right_arm_pos, mouse_pos));
-      RenderTexture2D rightArmRenderTex = LoadRenderTexture(distToCursor + 84, 114);
-      if (distToCursor > 297 && mouse_pos.x >= right_arm_pos.x) {
-        BeginTextureMode(rightArmRenderTex);
-        int endOfRod = distToCursor + 84 - 168;
-        DrawTexture(rightArmHead, endOfRod, 0, WHITE);
-        DrawTexturePro(rightArmRod, (Rectangle){0,0,153,114}, (Rectangle){79, 0, endOfRod - 79, 114}, (Vector2){0,0}, 0, WHITE);
-        DrawTexture(rightArmBearing, 0, 0, WHITE);
-        EndTextureMode();
-        robotArmRight = rightArmRenderTex.texture;
-      }
-
-      DrawTexturePro( robotArmRight, (Rectangle){0, 0, robotArmRight.width, robotArmRight.height},
-        (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
-        (Vector2){ 40, robotArmRight.height / 2.0f}, 
-        rightArmAngle , WHITE);
-    }
-
+    DrawRobotArms();
 
     DrawTextEffects();
 
@@ -984,6 +921,73 @@ void DrawConveyorBelt(float dt) {
   }
 
   DrawTexture(foregroundBelt, 0, 0, WHITE);
+}
+
+void DrawRobotArms(void) {
+  {
+    Vector2 left_arm_pos = {820,385};
+    // float left_arm_target_rot = 0;
+    // if (mouse_pos.x <= left_arm_pos.x) left_arm_target_rot = atan2f(left_arm_pos.y - mouse_pos.y,  left_arm_pos.x - mouse_pos.x ) * RAD2DEG;
+    //    // DrawText(TextFormat("%f",left_arm_angle),0,0,30,YELLOW);
+    // left_arm_target_rot = Clamp(left_arm_target_rot, -90, 90);
+    // if (fabsf(left_arm_target_rot - leftArmAngle) > 45) {
+    //       leftArmAngle = Lerp(leftArmAngle, left_arm_target_rot, 0.1);
+    // } else if (left_arm_target_rot != 0) {
+    //     leftArmAngle = left_arm_target_rot;
+    // } else {
+    //   leftArmAngle = Lerp(leftArmAngle, left_arm_target_rot, 0.05);
+    // }
+    
+    // float distToCursor = Vector2Length(Vector2Subtract(left_arm_pos, mouse_pos));
+    // RenderTexture2D leftArmRenderTex = LoadRenderTexture(distToCursor + 84, 114);
+    // if (distToCursor > 297 && mouse_pos.x <= left_arm_pos.x) {
+    //   BeginTextureMode(leftArmRenderTex);
+    //   int endOfRod = distToCursor + 84 - 79;
+    //   DrawTexture(leftArmHead, 0, 0, WHITE);
+    //   DrawTexturePro(leftArmRod, (Rectangle){0,0,153,114}, (Rectangle){168, 0, endOfRod - 168, 114}, (Vector2){0,0}, 0, WHITE);
+    //   DrawTexture(leftArmBearing, endOfRod, 0, WHITE);
+    //   EndTextureMode();
+    //   robotArmLeft = leftArmRenderTex.texture;
+    // }
+
+    DrawTexturePro( robotArmLeft, (Rectangle){0, 0, robotArmLeft.width, robotArmLeft.height},
+      (Rectangle){left_arm_pos.x, left_arm_pos.y, robotArmLeft.width, robotArmLeft.height},
+      (Vector2){robotArmLeft.width - 40, robotArmLeft.height / 2.0f}, 
+      leftArmAngle , WHITE);
+  }
+  {
+    Vector2 right_arm_pos = {1090,385};
+
+    // float right_arm_target_rot = 0;
+    // if (mouse_pos.x >= right_arm_pos.x) right_arm_target_rot = atan2f( mouse_pos.y - right_arm_pos.y ,   mouse_pos.x - right_arm_pos.x  ) * RAD2DEG;
+    //    // DrawText(TextFormat("%f",right_arm_angle),0,0,30,YELLOW);
+    //
+    // right_arm_target_rot = Clamp(right_arm_target_rot, -90, 90);
+    // if (fabsf(right_arm_target_rot - rightArmAngle) > 45) {
+    //       rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.1);
+    // } else if (right_arm_target_rot != 0) {
+    //     rightArmAngle = right_arm_target_rot;
+    // } else {
+    //   rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.05);
+    // }
+    //
+    // float distToCursor = Vector2Length(Vector2Subtract(right_arm_pos, mouse_pos));
+    // RenderTexture2D rightArmRenderTex = LoadRenderTexture(distToCursor + 84, 114);
+    // if (distToCursor > 297 && mouse_pos.x >= right_arm_pos.x) {
+    //   BeginTextureMode(rightArmRenderTex);
+    //   int endOfRod = distToCursor + 84 - 168;
+    //   DrawTexture(rightArmHead, endOfRod, 0, WHITE);
+    //   DrawTexturePro(rightArmRod, (Rectangle){0,0,153,114}, (Rectangle){79, 0, endOfRod - 79, 114}, (Vector2){0,0}, 0, WHITE);
+    //   DrawTexture(rightArmBearing, 0, 0, WHITE);
+    //   EndTextureMode();
+    //   robotArmRight = rightArmRenderTex.texture;
+    // }
+
+    DrawTexturePro( robotArmRight, (Rectangle){0, 0, robotArmRight.width, robotArmRight.height},
+      (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
+      (Vector2){ 40, robotArmRight.height / 2.0f}, 
+      rightArmAngle , WHITE);
+  }
 }
 
 void UpdateAndDrawSpeedControllers(Vector2 mouse_pos) {
