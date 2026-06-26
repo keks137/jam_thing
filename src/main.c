@@ -27,8 +27,11 @@
 #define TOTAL_GAME_TIME 360
 #define FPS 60
 
+
+
 typedef enum {
   START_SCREEN,
+  TUTORIAL_PHASE,
   EARLY_PHASE,
   MIDDLE_PHASE,
   END_PHASE,
@@ -83,6 +86,7 @@ typedef struct {
   Vector2 position;
   RenderTexture2D render_tex;
   bool delivered;
+  float speedModifier;
 } Pizza;
 
 typedef struct {
@@ -159,7 +163,7 @@ typedef struct {
 TextEffects textEffects = {0};
 
 
-GamePhase game_phase = EARLY_PHASE;
+GamePhase game_phase = TUTORIAL_PHASE;
 float start_time = 0;
 float game_phase_time = 0;
 
@@ -186,6 +190,8 @@ Texture2D pizzaBaseTex;
 Texture2D pizzaMaskTex;
 
 #define INGREDIENT_SCALE 0.3
+#define STANDARD_INGREDIENT_HITBOX_WIDTH 90
+#define STANDARD_INGREDIENT_HITBOX_HEIGHT 90
 Texture2D toppingsTex[__topping_type_count];
 
 Texture2D toppingPositionIconsTex[__topping_position_count];
@@ -228,6 +234,9 @@ float ptrRotation = -117; // 113
 
 size_t score = 0;
 bool firstPizzaServed = false;
+
+int startTime;
+bool timerActive = false;
 
 static void UpdateDrawFrame(void);
 void UpdateScore(Pizza pizza, Order order);
@@ -351,6 +360,15 @@ static void UpdateDrawFrame(void)
     case START_SCREEN: {
 
     } break;
+    case TUTORIAL_PHASE: {
+      if (firstPizzaServed) {
+        game_phase = EARLY_PHASE;
+        game_phase_time = time;
+        max_active_orders = 1;
+        conveyor_belt.speed = EARLY_PHASE_CONVEYOR_BELT_SPEED;
+      }
+      
+    }
     case EARLY_PHASE: {
       if (time - game_phase_time >= EARLY_PHASE_TIME) {
         game_phase = MIDDLE_PHASE;
@@ -382,9 +400,10 @@ static void UpdateDrawFrame(void)
 
   UpdateConveyorBelt();
 
+  // Rotate pizzas
   for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
     if (rotators[i].active && rotators[i].spinning) {
-      pizzas.items[rotators[i].pizza_index].rotation += rotators[i].rotation_speed * dt;
+      pizzas.items[rotators[i].pizza_index].rotation += rotators[i].rotation_speed * pizzas.items[rotators[i].pizza_index].speedModifier * dt;
     }
   }
 
@@ -392,9 +411,14 @@ static void UpdateDrawFrame(void)
 
   PlaceToppingOnPizza(mouse_pos);
 
+  bool wasFirstPizzaServed = firstPizzaServed;
   TossOrServe(mouse_pos, time);
-
+  if (firstPizzaServed) {
+    if (!wasFirstPizzaServed) {start_time = time;}
+    ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
   ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
+
+  }
 
 	BeginDrawing(); {
     ClearBackground(WHITE);
@@ -701,6 +725,13 @@ void UpdateOrders(double time) {
       int prob = rand() % 1000 + 1;
       Topping topping = {0};
       switch (game_phase) {
+        case TUTORIAL_PHASE: {
+          if (prob < 500) {
+            topping.requested_position = TOPPING_POSITION_FULL;
+          } else {
+            topping.requested_position = TOPPING_POSITION_HALF1;
+          }
+        }
         case EARLY_PHASE: {
           if (prob < 500) {
             topping.requested_position = TOPPING_POSITION_FULL;
@@ -764,6 +795,7 @@ void UpdateOrders(double time) {
         .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
         .toppings = {0}, 
         .delivered = false,
+        .speedModifier = 1 + (GetRandomValue(0, 30) / 10)
       }));
       break;
     }
@@ -808,10 +840,10 @@ void PickupToppingFromConveyorBelt(Vector2 mouse_pos) {
     for (size_t i = 0; i < conveyor_belt.count; i++) {
       ConveyorBeltIngredient ingredient = conveyor_belt.items[i];
       if (
-        mouse_pos.x < ingredient.position.x + toppingsTex[ingredient.type].width * INGREDIENT_SCALE * 1.2
-        && mouse_pos.x > ingredient.position.x 
-        && mouse_pos.y < ingredient.position.y + toppingsTex[ingredient.type].height * INGREDIENT_SCALE * 1.2
-        && mouse_pos.y > conveyor_belt.items[i].position.y 
+        mouse_pos.x < ingredient.position.x - STANDARD_INGREDIENT_HITBOX_WIDTH / 2.0f + STANDARD_INGREDIENT_HITBOX_WIDTH * 1.5f
+        && mouse_pos.x > ingredient.position.x - STANDARD_INGREDIENT_HITBOX_WIDTH / 2.0f
+        && mouse_pos.y < ingredient.position.y - STANDARD_INGREDIENT_HITBOX_HEIGHT / 2.0f + STANDARD_INGREDIENT_HITBOX_HEIGHT * 1.5f
+        && mouse_pos.y > conveyor_belt.items[i].position.y - STANDARD_INGREDIENT_HITBOX_HEIGHT / 2.0f
         && (mouse_pos.x < 805 || mouse_pos.x > 1115)
         && mouse_pos.x > 135
         && mouse_pos.x < 1920 - 135
@@ -872,6 +904,7 @@ void TossOrServe(Vector2 mouse_pos, double time) {
     if (rotators[1].active) {
       pizzas.items[rotators[1].pizza_index].rotation = 0;
       pizzas.items[rotators[1].pizza_index].toppings.count = 0;
+      
     }
   }
 
@@ -924,10 +957,10 @@ void DrawRobotArms(void) {
     Vector2 left_arm_attached_pos = {820,385};
     Vector2 left_arm_attached_rod_pos = {820 - leftArmBearing.width*2.1, 385 - leftArmBearing.height/2};
     Vector2 left_arm_rotating_part_pos = {675, left_arm_attached_rod_pos.y + leftArmBearing.height/2};
-    float left_arm_target_rot = 95;
-    // if (mouse_pos.x <= left_arm_pos.x) left_arm_target_rot = atan2f(left_arm_pos.y - mouse_pos.y,  left_arm_pos.x - mouse_pos.x ) * RAD2DEG;
+    float left_arm_target_rot = 0;
+    if (GetMouseX() <= left_arm_attached_pos.x) left_arm_target_rot = atan2f(left_arm_rotating_part_pos.y - GetMouseY(),  left_arm_rotating_part_pos.x - GetMouseX() ) * RAD2DEG;
     DrawText(TextFormat("%f",left_arm_target_rot),0,0,30,YELLOW);
-    left_arm_target_rot = Clamp(left_arm_target_rot, -75, 95);
+    left_arm_target_rot = Clamp(left_arm_target_rot, -95, 95);
     // if (fabsf(left_arm_target_rot - leftArmAngle) > 45) {
     //       leftArmAngle = Lerp(leftArmAngle, left_arm_target_rot, 0.1);
     // } else if (left_arm_target_rot != 0) {
