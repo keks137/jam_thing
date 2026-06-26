@@ -232,6 +232,18 @@ bool firstPizzaServed = false;
 
 static void UpdateDrawFrame(void);
 void UpdateScore(Pizza pizza, Order order);
+void UpdateOrders(double time);
+void UpdateConveyorBelt(void);
+void PickupToppingFromConveyorBelt(Vector2 mouse_pos);
+void PlaceToppingOnPizza(Vector2 mouse_pos);
+void TossOrServe(Vector2 mouse_pos, double time);
+void DrawConveyorBelt(float dt);
+void UpdateAndDrawSpeedControllers(Vector2 mouse_pos);
+void DrawPizzas(void);
+void DrawOrderTicket(void);
+void DrawPickedUpTopping(Vector2 mouse_pos);
+void DrawTextEffects(void);
+void DrawTutorial(void);
 
 int main()
 {
@@ -368,125 +380,9 @@ static void UpdateDrawFrame(void)
     } break;
   }
 
-  if (orders.active < max_active_orders) {
-    Order order = {
-      .completed = false,
-      .order_time = time,
-      .deliver_time = 0,
-      .requested_toppings = {0},
-    };
+  UpdateOrders(time);
 
-    Toppings available_toppings = {0};
-    da_append(&available_toppings, ((Topping){.type = TOPPING_MUSHROOM}));
-    da_append(&available_toppings, ((Topping){.type = TOPPING_OLIVE}));
-    da_append(&available_toppings, ((Topping){.type = TOPPING_PEPPERONI}));
-    da_append(&available_toppings, ((Topping){.type = TOPPING_BELL_PEPPER}));
-    da_append(&available_toppings, ((Topping){.type = TOPPING_CORN}));
-    da_append(&available_toppings, ((Topping){.type = TOPPING_FETA}));
-    da_append(&available_toppings, ((Topping){.type = TOPPING_SPINACH}));
-
-    for (size_t i = 0; i < max_toppings_per_pizza; i++) {
-      int prob = rand() % 1000 + 1;
-      Topping topping = {0};
-      switch (game_phase) {
-        case EARLY_PHASE: {
-          if (prob < 500) {
-            topping.requested_position = TOPPING_POSITION_FULL;
-          } else if (prob < 750) {
-            topping.requested_position = TOPPING_POSITION_HALF1;
-          } else {
-            topping.requested_position = TOPPING_POSITION_HALF2;
-          }
-        } break;
-        case MIDDLE_PHASE: {
-          if (prob < 200) {
-            topping.requested_position = TOPPING_POSITION_FULL;
-          } else if (prob < 550) {
-            topping.requested_position = TOPPING_POSITION_HALF1;
-          } else if (prob < 700) {
-            topping.requested_position = TOPPING_POSITION_HALF2;
-          } else if (prob < 850) {
-            topping.requested_position = TOPPING_POSITION_ALTERNATE1;
-          } else {
-            topping.requested_position = TOPPING_POSITION_ALTERNATE2;
-          }
-        } break;
-        case END_PHASE: {
-          if (prob < 200) {
-            topping.requested_position = TOPPING_POSITION_FULL;
-          } else if (prob < 400) {
-            topping.requested_position = TOPPING_POSITION_HALF1;
-          } else if (prob < 600) {
-            topping.requested_position = TOPPING_POSITION_HALF2;
-          } else if (prob < 800) {
-            topping.requested_position = TOPPING_POSITION_ALTERNATE1;
-          } else {
-            topping.requested_position = TOPPING_POSITION_ALTERNATE2;
-          }
-        } break;
-        default:
-          assert(false && "shouldn't add orders in this state");
-      }
-
-      size_t available_toppings_index = rand() % available_toppings.count;
-      topping.type = available_toppings.items[available_toppings_index].type;
-      da_remove_unordered(&available_toppings, available_toppings_index);
-
-      da_append(&order.requested_toppings, topping);
-    }
-    da_free(available_toppings);
-
-    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-      if (rotators[i].active) continue;
-      order.rotator_index = i;
-      rotators[i].order_index = orders.count;
-      order.pizza_index = pizzas.count;
-      rotators[i].pizza_index = pizzas.count;
-      rotators[i].active = true;
-      rotators[i].spinning = true;
-      da_append(&pizzas, ((Pizza){
-        .number_of_slices = 6,
-        .order_index = orders.count,
-        .rotation = 0,
-        .position = rotators[i].position,
-        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
-        .toppings = {0}, 
-        .delivered = false,
-      }));
-      break;
-    }
-    da_append(&orders, order);
-    orders.active += 1;
-  }
-
-  for (size_t i = 0; i < conveyor_belt.count; i++) {
-    conveyor_belt.items[i].position.x += conveyor_belt.speed;
-    if (conveyor_belt.items[i].position.x > SCREEN_WIDTH) {
-      memmove(conveyor_belt.items, &conveyor_belt.items[1], sizeof(ConveyorBeltIngredient)*conveyor_belt.count-1);
-      conveyor_belt.count -= 1;
-    }
-  }
-
-  if (
-    orders.active > 0 &&
-    (conveyor_belt.count == 0 
-    || da_last(&conveyor_belt).position.x + toppingsTex[da_last(&conveyor_belt).type].width/2 > CONVEYOR_BELT_INGREDIENT_GAP)
-  ) {
-    Toppings required_toppings = {0};
-    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-      if (!rotators[i].active) continue;
-      for (size_t j = 0; j < orders.items[rotators[i].order_index].requested_toppings.count; j++){
-        da_append(&required_toppings, ((Topping){.type = orders.items[rotators[i].order_index].requested_toppings.items[j].type}));
-      }
-    }
-    int required_toppings_index = rand() % required_toppings.count;
-    da_append(&conveyor_belt, ((ConveyorBeltIngredient){
-      .type = required_toppings.items[required_toppings_index].type,
-      .position = {.x = 0, .y = 120 - toppingsTex[required_toppings.items[required_toppings_index].type].height/2 * INGREDIENT_SCALE},
-    }));
-
-    da_free(required_toppings);
-  }
+  UpdateConveyorBelt();
 
   for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
     if (rotators[i].active && rotators[i].spinning) {
@@ -494,54 +390,11 @@ static void UpdateDrawFrame(void)
     }
   }
 
-  if (topping_selected == TOPPING_NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-    for (size_t i = 0; i < conveyor_belt.count; i++) {
-      ConveyorBeltIngredient ingredient = conveyor_belt.items[i];
-      if (
-        mouse_pos.x < ingredient.position.x + toppingsTex[ingredient.type].width * INGREDIENT_SCALE * 1.2
-        && mouse_pos.x > ingredient.position.x 
-        && mouse_pos.y < ingredient.position.y + toppingsTex[ingredient.type].height * INGREDIENT_SCALE * 1.2
-        && mouse_pos.y > conveyor_belt.items[i].position.y 
-        && (mouse_pos.x < 805 || mouse_pos.x > 1115)
-        && mouse_pos.x > 135
-        && mouse_pos.x < 1920 - 135
-      ) {
-        topping_selected = conveyor_belt.items[i].type;
-        conveyor_belt.items[i].type = TOPPING_NONE;
-        break;
-      }
-    }
-  }
-  
+  PickupToppingFromConveyorBelt(mouse_pos);
 
-  if (topping_selected != TOPPING_NONE && IsMouseButtonUp(MOUSE_BUTTON_LEFT)) {
-    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-      if (!rotators[i].active && !rotators[i].spinning) continue;
-      if (!CheckCollisionPointCircle(mouse_pos, rotators[i].position, PIZZA_RADIUS)) continue;
-      Vector2 triangle_verts[3] = {
-        rotators[i].position,
-        {
-          .x = rotators[i].position.x - PIZZA_RADIUS*tan(PI/pizzas.items[rotators[i].pizza_index].number_of_slices),
-          .y = rotators[i].position.y-PIZZA_RADIUS
-        },
-        {
-          .x = rotators[i].position.x + PIZZA_RADIUS*tan(PI/pizzas.items[rotators[i].pizza_index].number_of_slices),
-          .y = rotators[i].position.y-PIZZA_RADIUS
-        },
-      };
-      if (!CheckCollisionPointTriangle(mouse_pos, triangle_verts[0], triangle_verts[1], triangle_verts[2])) continue;
+  PlaceToppingOnPizza(mouse_pos);
 
-      Topping topping = {
-        .type = topping_selected,
-        .offset_from_center = Vector2Distance(mouse_pos, rotators[i].position),
-        .rotation = atan2f(mouse_pos.y - rotators[i].position.y,
-                        mouse_pos.x - rotators[i].position.x) - pizzas.items[rotators[i].pizza_index].rotation,
-        .requested_position = TOPPING_POSITION_NONE
-      }; 
-      da_append(&pizzas.items[rotators[i].pizza_index].toppings, topping);
-    }
-    topping_selected = TOPPING_NONE;
-  }
+  TossOrServe(mouse_pos, time);
 
   ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
 
@@ -550,358 +403,95 @@ static void UpdateDrawFrame(void)
     
     DrawTexture(backgroundTex, 0, 0, WHITE);
 
-    beltTimer += dt;
-    if (beltTimer >= 1.0f/6.0f) {
-      beltTimer = 0;
-      currentBeltFrame = (currentBeltFrame + 1) % 3;
-    }
-    DrawTexture(conveyorBeltFrames[currentBeltFrame], 0, 30, WHITE);
 
     DrawTexture(tossButtonImg, 105, 977, WHITE);
     DrawTexture(serverButtonImg, 21, 977, WHITE);
     DrawTexture(tossButtonImg, 1829, 977, WHITE);
     DrawTexture(serverButtonImg, 1745, 977, WHITE);
 
-    Rectangle leftTossButton = {105, 977, 78, 78};
-    Rectangle rightTossButton = {1829, 977, 78, 78};
-    Rectangle leftServeButton = {21, 977, 78, 78};
-    Rectangle rightServeButton = {1745, 977, 78, 78};
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftTossButton)) {
-      if (rotators[0].active) {
-        pizzas.items[rotators[0].pizza_index].rotation = 0;
-        pizzas.items[rotators[0].pizza_index].toppings.count = 0;
-      }
-    }
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightTossButton)) {
-      if (rotators[1].active) {
-        pizzas.items[rotators[1].pizza_index].rotation = 0;
-        pizzas.items[rotators[1].pizza_index].toppings.count = 0;
-      }
-    }
-
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftServeButton)) {
-      if (rotators[0].active) {
-        if (!firstPizzaServed) firstPizzaServed = true;
-        rotators[0].spinning = false;
-        rotators[0].active = false;
-        orders.items[rotators[0].order_index].completed = true;
-        orders.items[rotators[0].order_index].deliver_time = time;
-        orders.active -= 1;
-        pizzas.items[rotators[0].pizza_index].delivered = true;
-        UpdateScore(pizzas.items[rotators[0].pizza_index], orders.items[rotators[0].order_index]);
-      }
-    }
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightServeButton)) {
-      if (rotators[1].active) {
-        if (!firstPizzaServed) firstPizzaServed = true;
-        rotators[1].spinning = false;
-        rotators[1].active = false;
-        orders.items[rotators[1].order_index].completed = true;
-        orders.items[rotators[1].order_index].deliver_time = time;
-        orders.active -= 1;
-        pizzas.items[rotators[1].pizza_index].delivered = true;
-        UpdateScore(pizzas.items[rotators[1].pizza_index], orders.items[rotators[1].order_index]);
-      }
-    }
-
-    // Conveyor belt
-    for (size_t i = 0; i < conveyor_belt.count; i++) {
-      Texture2D toppingTexture = toppingsTex[conveyor_belt.items[i].type];
-      float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
-      float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
-      Rectangle targetRect = {conveyor_belt.items[i].position.x, conveyor_belt.items[i].position.y, targetWidth, targetHeight};
-      DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height}, targetRect, (Vector2){0,0}, 0, WHITE);
-      
-    }
-
-    DrawTexture(foregroundBelt, 0, 0, WHITE);
+    DrawConveyorBelt(dt);
 
     DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
 
     DrawText(scoreStr, 852, 619, 70, YELLOW);
 
-    // RPM controller
+    UpdateAndDrawSpeedControllers(mouse_pos);
 
-    int topY =  840;
-    int bottomY = 1010;
-    float minSpeed = 31.415 * (PI / 180);
-    float maxSpeed = minSpeed * 4;
+    DrawPizzas();
 
+    DrawOrderTicket();
 
-    int leftY = topY + (1.0f - (rotators[0].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
-    int rightY = topY + (1.0f - (rotators[1].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
-    //DrawTexture(speedControllerTex, 845, leftY, WHITE);
-    //DrawTexture(speedControllerTex, 1030, rightY, WHITE);
-    DrawTexture(speedControllerTex, 826, leftY, WHITE);
-    DrawTexture(speedControllerTex, 1018, rightY, WHITE);
-    
+    DrawPickedUpTopping(mouse_pos);
 
-    bool openToDrag = topping_selected == TOPPING_NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-    
-    if (CheckCollisionPointRec(mouse_pos, (Rectangle){826.0f, (float)leftY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl && pizzas.items[0].toppings.count < 1) {
-      draggingLeftCtrl = true;
-      
-    }
-    if (CheckCollisionPointRec(mouse_pos, (Rectangle){1018.0f, (float)rightY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl && pizzas.items[1].toppings.count < 1) {
-      draggingRightCtrl = true;
-      
-    }
-    if (draggingLeftCtrl) {
-      if (rotators[0].active && rotators[0].spinning) {
-        rotators[0].rotation_speed = ((float)(1.0f - ((mouse_pos.y - 19 * 4) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
-        rotators[0].rotation_speed = minSpeed + maxSpeed * (round(((rotators[0].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
-        rotators[0].rotation_speed = (((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) : maxSpeed;
-
-        if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-          draggingLeftCtrl = false;
-        }
+    {
+      Vector2 left_arm_pos = {820,385};
+      float left_arm_target_rot = 0;
+      if (mouse_pos.x <= left_arm_pos.x) left_arm_target_rot = atan2f(left_arm_pos.y - mouse_pos.y,  left_arm_pos.x - mouse_pos.x ) * RAD2DEG;
+         // DrawText(TextFormat("%f",left_arm_angle),0,0,30,YELLOW);
+      left_arm_target_rot = Clamp(left_arm_target_rot, -90, 90);
+      if (fabsf(left_arm_target_rot - leftArmAngle) > 45) {
+            leftArmAngle = Lerp(leftArmAngle, left_arm_target_rot, 0.1);
+      } else if (left_arm_target_rot != 0) {
+          leftArmAngle = left_arm_target_rot;
+      } else {
+        leftArmAngle = Lerp(leftArmAngle, left_arm_target_rot, 0.05);
       }
-    } 
-    if (draggingRightCtrl) {
-      if (rotators[1].active && rotators[1].spinning) {
-       
-        rotators[1].rotation_speed = ((float)(1.0f - ((mouse_pos.y - 19 * 4) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
-        rotators[1].rotation_speed = minSpeed + maxSpeed * (round(((rotators[1].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
-        rotators[1].rotation_speed = (((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) : maxSpeed;
-
-        
-        if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
-          draggingRightCtrl = false;
-        }
+      
+      float distToCursor = Vector2Length(Vector2Subtract(left_arm_pos, mouse_pos));
+      RenderTexture2D leftArmRenderTex = LoadRenderTexture(distToCursor + 84, 114);
+      if (distToCursor > 297 && mouse_pos.x <= left_arm_pos.x) {
+        BeginTextureMode(leftArmRenderTex);
+        int endOfRod = distToCursor + 84 - 79;
+        DrawTexture(leftArmHead, 0, 0, WHITE);
+        DrawTexturePro(leftArmRod, (Rectangle){0,0,153,114}, (Rectangle){168, 0, endOfRod - 168, 114}, (Vector2){0,0}, 0, WHITE);
+        DrawTexture(leftArmBearing, endOfRod, 0, WHITE);
+        EndTextureMode();
+        robotArmLeft = leftArmRenderTex.texture;
       }
-    }
 
-    for (size_t i = 0; i < pizzas.count; i ++) {
-      if (pizzas.items[i].delivered) continue;
-      BeginTextureMode(pizzas.items[i].render_tex); {
-        ClearBackground(BLANK);
-
-        DrawTexture(pizzaBaseTex, 0, 0, WHITE);
-        for (size_t j = 1; j <= pizzas.items[i].number_of_slices; j++) {
-          DrawLine(PIZZA_RADIUS, PIZZA_RADIUS, PIZZA_RADIUS + PIZZA_RADIUS * cosf(j*2*PI/pizzas.items[i].number_of_slices), PIZZA_RADIUS + PIZZA_RADIUS * sinf(j*2*PI/pizzas.items[i].number_of_slices), BLACK);
-        }
-
-         for (size_t j = 0; j < pizzas.items[i].toppings.count; j++) {
-          Texture2D toppingTexture = toppingsTex[(assert(pizzas.items[i].toppings.items[j].type != TOPPING_NONE), pizzas.items[i].toppings.items[j].type)];
-          float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
-          float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
-          Rectangle rec = {
-            .x = PIZZA_RADIUS + pizzas.items[i].toppings.items[j].offset_from_center * cosf(pizzas.items[i].toppings.items[j].rotation),
-            .y = PIZZA_RADIUS + pizzas.items[i].toppings.items[j].offset_from_center * sinf(pizzas.items[i].toppings.items[j].rotation),
-            .width = targetWidth,
-            .height = targetHeight,
-          };
-          DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height},rec, (Vector2){.x = targetWidth / 2, .y = targetHeight / 2}, pizzas.items[i].toppings.items[j].rotation * RAD2DEG, WHITE);
-        }
-      } EndTextureMode();
-
-      DrawTexturePro(
-        pizzas.items[i].render_tex.texture,
-        (Rectangle){
-          0,
-          0,
-          pizzas.items[i].render_tex.texture.width,
-          -pizzas.items[i].render_tex.texture.height
-        },
-        (Rectangle){
-          pizzas.items[i].position.x,
-          pizzas.items[i].position.y,
-          pizzas.items[i].render_tex.texture.width,
-          pizzas.items[i].render_tex.texture.height
-        },
-        (Vector2){
-            pizzas.items[i].render_tex.texture.width/2.0f,
-            pizzas.items[i].render_tex.texture.height/2.0f
-        },
-        pizzas.items[i].rotation * RAD2DEG,
-        WHITE
-      );
-      DrawTexturePro(
-        pizzaMaskTex,
-        (Rectangle){
-          0,
-          0,
-          pizzas.items[i].render_tex.texture.width,
-          -pizzas.items[i].render_tex.texture.height
-        },
-        (Rectangle){
-          pizzas.items[i].position.x,
-          pizzas.items[i].position.y,
-          pizzas.items[i].render_tex.texture.width,
-          pizzas.items[i].render_tex.texture.height
-        },
-        (Vector2){
-            pizzas.items[i].render_tex.texture.width/2.0f,
-            pizzas.items[i].render_tex.texture.height/2.0f
-        },
-        180,
-        WHITE
-      );
-    }
-
-
-    for (size_t i = 0; i < ARRAY_LEN(orderTickets); i++) {
-      BeginTextureMode(orderTickets[i].render_tex); {
-        DrawTexture(blankOrderTicketTex, 0, 0, WHITE);
-        if (rotators[i].active) {
-          size_t order_index = rotators[i].order_index;
-          Order order = orders.items[order_index];
-          Vector2 position = {20, 150};
-          for (size_t j = 0; j < order.requested_toppings.count; j++) {
-            Topping topping = order.requested_toppings.items[j];
-            ToppingPosition topping_position = topping.requested_position;
-
-            DrawTextureEx(
-              toppingPositionIconsTex[(assert(topping_position != TOPPING_POSITION_NONE && topping_position < __topping_position_count && "topping positioning is either none or unkown"), topping_position)],
-              position,
-              0,
-              TOPPING_POSITION_ICON_SCALE,
-              WHITE
-            );
-
-            Texture2D tex = toppingsTex[(assert(topping.type != TOPPING_NONE && topping.type < __topping_type_count && "topping type is either none or unkown inside order"), topping.type)];
-            float scale = 0.3;
-            switch(topping.type) {
-              case TOPPING_MUSHROOM: scale = 0.25; break;
-              case TOPPING_BELL_PEPPER: scale = 0.2; break;
-              default: break;
-            }
-            DrawTexturePro(
-              tex,
-              (Rectangle){
-                0,
-                0,
-                tex.width,
-                tex.height
-              },
-              (Rectangle){
-                position.x + 70,
-                position.y,
-                tex.width * scale,
-                tex.height * scale
-              },
-              (Vector2){0, 0},
-              0,
-              WHITE
-            );
-            position.y += 100;
-          }
-        }
-      } EndTextureMode();
-      DrawTexturePro(
-        orderTickets[i].render_tex.texture,
-        (Rectangle){
-          0,
-          0,
-          orderTickets[i].render_tex.texture.width,
-          -orderTickets[i].render_tex.texture.height
-        },
-        (Rectangle){
-          orderTickets[i].position.x,
-          orderTickets[i].position.y,
-          orderTickets[i].render_tex.texture.width,
-          orderTickets[i].render_tex.texture.height
-        },
-        (Vector2){0, 0},
-        0,
-        WHITE
-      );
-    }
-
-    if (topping_selected != TOPPING_NONE) {
-      Texture2D toppingTexture = toppingsTex[(assert(topping_selected != TOPPING_NONE), topping_selected)];
-      float targetWidth = toppingTexture.width * INGREDIENT_SCALE * 1.25f;
-      float targetHeight = toppingTexture.height * INGREDIENT_SCALE * 1.25f;
-      Rectangle targetRect = {mouse_pos.x - targetWidth / 2, mouse_pos.y - targetHeight / 2, targetWidth, targetHeight};
-      DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height}, targetRect, (Vector2){0,0}, 0, WHITE);
+      DrawTexturePro( robotArmLeft, (Rectangle){0, 0, robotArmLeft.width, robotArmLeft.height},
+        (Rectangle){left_arm_pos.x, left_arm_pos.y, robotArmLeft.width, robotArmLeft.height},
+        (Vector2){robotArmLeft.width - 40, robotArmLeft.height / 2.0f}, 
+        leftArmAngle , WHITE);
     }
     {
-    Vector2 left_arm_pos = {820,385};
-    float left_arm_target_rot = 0;
-    if (mouse_pos.x <= left_arm_pos.x) left_arm_target_rot = atan2f(left_arm_pos.y - mouse_pos.y,  left_arm_pos.x - mouse_pos.x ) * RAD2DEG;
-       // DrawText(TextFormat("%f",left_arm_angle),0,0,30,YELLOW);
-    left_arm_target_rot = Clamp(left_arm_target_rot, -90, 90);
-    if (fabsf(left_arm_target_rot - leftArmAngle) > 45) {
-          leftArmAngle = Lerp(leftArmAngle, left_arm_target_rot, 0.1);
-    } else if (left_arm_target_rot != 0) {
-        leftArmAngle = left_arm_target_rot;
-    } 
-    else {
-      leftArmAngle = Lerp(leftArmAngle, left_arm_target_rot, 0.05);
-    }
-    
-    float distToCursor = Vector2Length(Vector2Subtract(left_arm_pos, mouse_pos));
-    RenderTexture2D leftArmRenderTex = LoadRenderTexture(distToCursor + 84, 114);
-    if (distToCursor > 297 && mouse_pos.x <= left_arm_pos.x) {
-      BeginTextureMode(leftArmRenderTex);
-      int endOfRod = distToCursor + 84 - 79;
-      DrawTexture(leftArmHead, 0, 0, WHITE);
-      DrawTexturePro(leftArmRod, (Rectangle){0,0,153,114}, (Rectangle){168, 0, endOfRod - 168, 114}, (Vector2){0,0}, 0, WHITE);
-      DrawTexture(leftArmBearing, endOfRod, 0, WHITE);
-      EndTextureMode();
-      robotArmLeft = leftArmRenderTex.texture;
-    }
+      Vector2 right_arm_pos = {1090,385};
 
+      float right_arm_target_rot = 0;
+      if (mouse_pos.x >= right_arm_pos.x) right_arm_target_rot = atan2f( mouse_pos.y - right_arm_pos.y ,   mouse_pos.x - right_arm_pos.x  ) * RAD2DEG;
+         // DrawText(TextFormat("%f",right_arm_angle),0,0,30,YELLOW);
 
-    DrawTexturePro( robotArmLeft, (Rectangle){0, 0, robotArmLeft.width, robotArmLeft.height},
-		    (Rectangle){left_arm_pos.x, left_arm_pos.y, robotArmLeft.width, robotArmLeft.height},
-		    (Vector2){robotArmLeft.width - 40, robotArmLeft.height / 2.0f}, 
-		    leftArmAngle , WHITE);
-    }
-    {
-    Vector2 right_arm_pos = {1090,385};
-    
-    float right_arm_target_rot = 0;
-    if (mouse_pos.x >= right_arm_pos.x) right_arm_target_rot = atan2f( mouse_pos.y - right_arm_pos.y ,   mouse_pos.x - right_arm_pos.x  ) * RAD2DEG;
-       // DrawText(TextFormat("%f",right_arm_angle),0,0,30,YELLOW);
-
-    right_arm_target_rot = Clamp(right_arm_target_rot, -90, 90);
-    if (fabsf(right_arm_target_rot - rightArmAngle) > 45) {
-          rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.1);
-    } else if (right_arm_target_rot != 0) {
-        rightArmAngle = right_arm_target_rot;
-    } else {
-      rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.05);
-    }
-
-    float distToCursor = Vector2Length(Vector2Subtract(right_arm_pos, mouse_pos));
-    RenderTexture2D rightArmRenderTex = LoadRenderTexture(distToCursor + 84, 114);
-    if (distToCursor > 297 && mouse_pos.x >= right_arm_pos.x) {
-      BeginTextureMode(rightArmRenderTex);
-      int endOfRod = distToCursor + 84 - 168;
-      DrawTexture(rightArmHead, endOfRod, 0, WHITE);
-      DrawTexturePro(rightArmRod, (Rectangle){0,0,153,114}, (Rectangle){79, 0, endOfRod - 79, 114}, (Vector2){0,0}, 0, WHITE);
-      DrawTexture(rightArmBearing, 0, 0, WHITE);
-      EndTextureMode();
-      robotArmRight = rightArmRenderTex.texture;
-    }
-    
-    DrawTexturePro( robotArmRight, (Rectangle){0, 0, robotArmRight.width, robotArmRight.height},
-		    (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
-		    (Vector2){ 40, robotArmRight.height / 2.0f}, 
-		    rightArmAngle , WHITE);
-
-
-    for (int i = textEffects.count - 1; i >= 0; i--) {
-      TextEffect textEffect = textEffects.items[i];
-      DrawText(textEffect.text, textEffect.position.x, textEffect.position.y, textEffect.size, (Color){255, 255, 255, textEffect.opacity});
-      textEffects.items[i].opacity -= 2;
-      textEffects.items[i].position.y -= 2;
-      //textEffects.items[i].size -= 1;
-      if (textEffects.items[i].opacity <= 0 || textEffects.items[i].position.y + textEffects.items[i].size <= 0 || textEffects.items[i].size <= 3) {
-        textEffects.items[i] = textEffects.items[textEffects.count - 1];
-        textEffects.count--;
+      right_arm_target_rot = Clamp(right_arm_target_rot, -90, 90);
+      if (fabsf(right_arm_target_rot - rightArmAngle) > 45) {
+            rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.1);
+      } else if (right_arm_target_rot != 0) {
+          rightArmAngle = right_arm_target_rot;
+      } else {
+        rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.05);
       }
+
+      float distToCursor = Vector2Length(Vector2Subtract(right_arm_pos, mouse_pos));
+      RenderTexture2D rightArmRenderTex = LoadRenderTexture(distToCursor + 84, 114);
+      if (distToCursor > 297 && mouse_pos.x >= right_arm_pos.x) {
+        BeginTextureMode(rightArmRenderTex);
+        int endOfRod = distToCursor + 84 - 168;
+        DrawTexture(rightArmHead, endOfRod, 0, WHITE);
+        DrawTexturePro(rightArmRod, (Rectangle){0,0,153,114}, (Rectangle){79, 0, endOfRod - 79, 114}, (Vector2){0,0}, 0, WHITE);
+        DrawTexture(rightArmBearing, 0, 0, WHITE);
+        EndTextureMode();
+        robotArmRight = rightArmRenderTex.texture;
+      }
+
+      DrawTexturePro( robotArmRight, (Rectangle){0, 0, robotArmRight.width, robotArmRight.height},
+        (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
+        (Vector2){ 40, robotArmRight.height / 2.0f}, 
+        rightArmAngle , WHITE);
     }
 
-    if (!firstPizzaServed) {
-      DrawTexture(tutorialTex, tutorialX, (SCREEN_HEIGHT - tutorialTex.height) / 2, WHITE);
-    } else if (tutorialX < SCREEN_WIDTH)
-      tutorialX += 15;
-      DrawTexture(tutorialTex, tutorialX, (SCREEN_HEIGHT - tutorialTex.height) / 2, WHITE);
-    }
+
+    DrawTextEffects();
+
+    DrawTutorial();
   } EndDrawing();
 }
 
@@ -1154,4 +744,463 @@ void UpdateScore(Pizza pizza, Order order) {
   da_append(&textEffects, ((TextEffect){.text = "", .opacity = 255, .position =(Vector2){852, 619 - 30}, .size = 60}));
   snprintf(textEffects.items[textEffects.count - 1].text, sizeof(textEffects.items[textEffects.count - 1].text), "%d", scoreChange);
   sprintf(scoreStr, "%zu", score);
+}
+
+void UpdateOrders(double time) {
+  if (orders.active < max_active_orders) {
+    Order order = {
+      .completed = false,
+      .order_time = time,
+      .deliver_time = 0,
+      .requested_toppings = {0},
+    };
+
+    Toppings available_toppings = {0};
+    da_append(&available_toppings, ((Topping){.type = TOPPING_MUSHROOM}));
+    da_append(&available_toppings, ((Topping){.type = TOPPING_OLIVE}));
+    da_append(&available_toppings, ((Topping){.type = TOPPING_PEPPERONI}));
+    da_append(&available_toppings, ((Topping){.type = TOPPING_BELL_PEPPER}));
+    da_append(&available_toppings, ((Topping){.type = TOPPING_CORN}));
+    da_append(&available_toppings, ((Topping){.type = TOPPING_FETA}));
+    da_append(&available_toppings, ((Topping){.type = TOPPING_SPINACH}));
+
+    for (size_t i = 0; i < max_toppings_per_pizza; i++) {
+      int prob = rand() % 1000 + 1;
+      Topping topping = {0};
+      switch (game_phase) {
+        case EARLY_PHASE: {
+          if (prob < 500) {
+            topping.requested_position = TOPPING_POSITION_FULL;
+          } else if (prob < 750) {
+            topping.requested_position = TOPPING_POSITION_HALF1;
+          } else {
+            topping.requested_position = TOPPING_POSITION_HALF2;
+          }
+        } break;
+        case MIDDLE_PHASE: {
+          if (prob < 200) {
+            topping.requested_position = TOPPING_POSITION_FULL;
+          } else if (prob < 550) {
+            topping.requested_position = TOPPING_POSITION_HALF1;
+          } else if (prob < 700) {
+            topping.requested_position = TOPPING_POSITION_HALF2;
+          } else if (prob < 850) {
+            topping.requested_position = TOPPING_POSITION_ALTERNATE1;
+          } else {
+            topping.requested_position = TOPPING_POSITION_ALTERNATE2;
+          }
+        } break;
+        case END_PHASE: {
+          if (prob < 200) {
+            topping.requested_position = TOPPING_POSITION_FULL;
+          } else if (prob < 400) {
+            topping.requested_position = TOPPING_POSITION_HALF1;
+          } else if (prob < 600) {
+            topping.requested_position = TOPPING_POSITION_HALF2;
+          } else if (prob < 800) {
+            topping.requested_position = TOPPING_POSITION_ALTERNATE1;
+          } else {
+            topping.requested_position = TOPPING_POSITION_ALTERNATE2;
+          }
+        } break;
+        default:
+          assert(false && "shouldn't add orders in this state");
+      }
+
+      size_t available_toppings_index = rand() % available_toppings.count;
+      topping.type = available_toppings.items[available_toppings_index].type;
+      da_remove_unordered(&available_toppings, available_toppings_index);
+
+      da_append(&order.requested_toppings, topping);
+    }
+    da_free(available_toppings);
+
+    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
+      if (rotators[i].active) continue;
+      order.rotator_index = i;
+      rotators[i].order_index = orders.count;
+      order.pizza_index = pizzas.count;
+      rotators[i].pizza_index = pizzas.count;
+      rotators[i].active = true;
+      rotators[i].spinning = true;
+      da_append(&pizzas, ((Pizza){
+        .number_of_slices = 6,
+        .order_index = orders.count,
+        .rotation = 0,
+        .position = rotators[i].position,
+        .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
+        .toppings = {0}, 
+        .delivered = false,
+      }));
+      break;
+    }
+    da_append(&orders, order);
+    orders.active += 1;
+  }
+}
+
+void UpdateConveyorBelt(void) {
+  for (size_t i = 0; i < conveyor_belt.count; i++) {
+    conveyor_belt.items[i].position.x += conveyor_belt.speed;
+    if (conveyor_belt.items[i].position.x > SCREEN_WIDTH) {
+      memmove(conveyor_belt.items, &conveyor_belt.items[1], sizeof(ConveyorBeltIngredient)*conveyor_belt.count-1);
+      conveyor_belt.count -= 1;
+    }
+  }
+
+  if (
+    orders.active > 0 &&
+    (conveyor_belt.count == 0 
+    || da_last(&conveyor_belt).position.x + toppingsTex[da_last(&conveyor_belt).type].width/2 > CONVEYOR_BELT_INGREDIENT_GAP)
+  ) {
+    Toppings required_toppings = {0};
+    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
+      if (!rotators[i].active) continue;
+      for (size_t j = 0; j < orders.items[rotators[i].order_index].requested_toppings.count; j++){
+        da_append(&required_toppings, ((Topping){.type = orders.items[rotators[i].order_index].requested_toppings.items[j].type}));
+      }
+    }
+    int required_toppings_index = rand() % required_toppings.count;
+    da_append(&conveyor_belt, ((ConveyorBeltIngredient){
+      .type = required_toppings.items[required_toppings_index].type,
+      .position = {.x = 0, .y = 120 - toppingsTex[required_toppings.items[required_toppings_index].type].height/2 * INGREDIENT_SCALE},
+    }));
+
+    da_free(required_toppings);
+  }
+}
+
+void PickupToppingFromConveyorBelt(Vector2 mouse_pos) {
+  if (topping_selected == TOPPING_NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    for (size_t i = 0; i < conveyor_belt.count; i++) {
+      ConveyorBeltIngredient ingredient = conveyor_belt.items[i];
+      if (
+        mouse_pos.x < ingredient.position.x + toppingsTex[ingredient.type].width * INGREDIENT_SCALE * 1.2
+        && mouse_pos.x > ingredient.position.x 
+        && mouse_pos.y < ingredient.position.y + toppingsTex[ingredient.type].height * INGREDIENT_SCALE * 1.2
+        && mouse_pos.y > conveyor_belt.items[i].position.y 
+        && (mouse_pos.x < 805 || mouse_pos.x > 1115)
+        && mouse_pos.x > 135
+        && mouse_pos.x < 1920 - 135
+      ) {
+        topping_selected = conveyor_belt.items[i].type;
+        conveyor_belt.items[i].type = TOPPING_NONE;
+        break;
+      }
+    }
+  }
+}
+
+void PlaceToppingOnPizza(Vector2 mouse_pos) {
+  if (topping_selected != TOPPING_NONE && IsMouseButtonUp(MOUSE_BUTTON_LEFT)) {
+    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
+      if (!rotators[i].active && !rotators[i].spinning) continue;
+      if (!CheckCollisionPointCircle(mouse_pos, rotators[i].position, PIZZA_RADIUS)) continue;
+      Vector2 triangle_verts[3] = {
+        rotators[i].position,
+        {
+          .x = rotators[i].position.x - PIZZA_RADIUS*tan(PI/pizzas.items[rotators[i].pizza_index].number_of_slices),
+          .y = rotators[i].position.y-PIZZA_RADIUS
+        },
+        {
+          .x = rotators[i].position.x + PIZZA_RADIUS*tan(PI/pizzas.items[rotators[i].pizza_index].number_of_slices),
+          .y = rotators[i].position.y-PIZZA_RADIUS
+        },
+      };
+      if (!CheckCollisionPointTriangle(mouse_pos, triangle_verts[0], triangle_verts[1], triangle_verts[2])) continue;
+
+      Topping topping = {
+        .type = topping_selected,
+        .offset_from_center = Vector2Distance(mouse_pos, rotators[i].position),
+        .rotation = atan2f(mouse_pos.y - rotators[i].position.y,
+                        mouse_pos.x - rotators[i].position.x) - pizzas.items[rotators[i].pizza_index].rotation,
+        .requested_position = TOPPING_POSITION_NONE
+      }; 
+      da_append(&pizzas.items[rotators[i].pizza_index].toppings, topping);
+    }
+    topping_selected = TOPPING_NONE;
+  }
+}
+
+void TossOrServe(Vector2 mouse_pos, double time) {
+  Rectangle leftTossButton = {105, 977, 78, 78};
+  Rectangle rightTossButton = {1829, 977, 78, 78};
+  Rectangle leftServeButton = {21, 977, 78, 78};
+  Rectangle rightServeButton = {1745, 977, 78, 78};
+
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftTossButton)) {
+    if (rotators[0].active) {
+      pizzas.items[rotators[0].pizza_index].rotation = 0;
+      pizzas.items[rotators[0].pizza_index].toppings.count = 0;
+    }
+  }
+
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightTossButton)) {
+    if (rotators[1].active) {
+      pizzas.items[rotators[1].pizza_index].rotation = 0;
+      pizzas.items[rotators[1].pizza_index].toppings.count = 0;
+    }
+  }
+
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftServeButton)) {
+    if (rotators[0].active) {
+      if (!firstPizzaServed) firstPizzaServed = true;
+      rotators[0].spinning = false;
+      rotators[0].active = false;
+      orders.items[rotators[0].order_index].completed = true;
+      orders.items[rotators[0].order_index].deliver_time = time;
+      orders.active -= 1;
+      pizzas.items[rotators[0].pizza_index].delivered = true;
+      UpdateScore(pizzas.items[rotators[0].pizza_index], orders.items[rotators[0].order_index]);
+    }
+  }
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightServeButton)) {
+    if (rotators[1].active) {
+      if (!firstPizzaServed) firstPizzaServed = true;
+      rotators[1].spinning = false;
+      rotators[1].active = false;
+      orders.items[rotators[1].order_index].completed = true;
+      orders.items[rotators[1].order_index].deliver_time = time;
+      orders.active -= 1;
+      pizzas.items[rotators[1].pizza_index].delivered = true;
+      UpdateScore(pizzas.items[rotators[1].pizza_index], orders.items[rotators[1].order_index]);
+    }
+  }
+}
+
+void DrawConveyorBelt(float dt) {
+  beltTimer += dt;
+  if (beltTimer >= 1.0f/6.0f) {
+    beltTimer = 0;
+    currentBeltFrame = (currentBeltFrame + 1) % 3;
+  }
+  DrawTexture(conveyorBeltFrames[currentBeltFrame], 0, 30, WHITE);
+  for (size_t i = 0; i < conveyor_belt.count; i++) {
+    Texture2D toppingTexture = toppingsTex[conveyor_belt.items[i].type];
+    float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
+    float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
+    Rectangle targetRect = {conveyor_belt.items[i].position.x, conveyor_belt.items[i].position.y, targetWidth, targetHeight};
+    DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height}, targetRect, (Vector2){0,0}, 0, WHITE);
+  }
+
+  DrawTexture(foregroundBelt, 0, 0, WHITE);
+}
+
+void UpdateAndDrawSpeedControllers(Vector2 mouse_pos) {
+  int topY =  840;
+  int bottomY = 1010;
+  float minSpeed = 31.415 * (PI / 180);
+  float maxSpeed = minSpeed * 4;
+
+  int leftY = topY + (1.0f - (rotators[0].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
+  int rightY = topY + (1.0f - (rotators[1].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
+
+  DrawTexture(speedControllerTex, 826, leftY, WHITE);
+  DrawTexture(speedControllerTex, 1018, rightY, WHITE);
+
+  bool openToDrag = topping_selected == TOPPING_NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+  
+  if (CheckCollisionPointRec(mouse_pos, (Rectangle){826.0f, (float)leftY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl && pizzas.items[0].toppings.count < 1) {
+    draggingLeftCtrl = true;
+  }
+
+  if (CheckCollisionPointRec(mouse_pos, (Rectangle){1018.0f, (float)rightY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl && pizzas.items[1].toppings.count < 1) {
+    draggingRightCtrl = true;
+  }
+
+  if (draggingLeftCtrl) {
+    if (rotators[0].active && rotators[0].spinning) {
+      rotators[0].rotation_speed = ((float)(1.0f - ((mouse_pos.y - 19 * 4) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
+      rotators[0].rotation_speed = minSpeed + maxSpeed * (round(((rotators[0].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
+      rotators[0].rotation_speed = (((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) : maxSpeed;
+
+      if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        draggingLeftCtrl = false;
+      }
+    }
+  } 
+  if (draggingRightCtrl) {
+    if (rotators[1].active && rotators[1].spinning) {
+     
+      rotators[1].rotation_speed = ((float)(1.0f - ((mouse_pos.y - 19 * 4) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
+      rotators[1].rotation_speed = minSpeed + maxSpeed * (round(((rotators[1].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
+      rotators[1].rotation_speed = (((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[1].rotation_speed > minSpeed) ? rotators[1].rotation_speed : minSpeed) : maxSpeed;
+
+      
+      if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        draggingRightCtrl = false;
+      }
+    }
+  }
+}
+
+void DrawPizzas(void) {
+  for (size_t i = 0; i < pizzas.count; i ++) {
+    if (pizzas.items[i].delivered) continue;
+    BeginTextureMode(pizzas.items[i].render_tex); {
+      ClearBackground(BLANK);
+
+      DrawTexture(pizzaBaseTex, 0, 0, WHITE);
+      for (size_t j = 1; j <= pizzas.items[i].number_of_slices; j++) {
+        DrawLine(PIZZA_RADIUS, PIZZA_RADIUS, PIZZA_RADIUS + PIZZA_RADIUS * cosf(j*2*PI/pizzas.items[i].number_of_slices), PIZZA_RADIUS + PIZZA_RADIUS * sinf(j*2*PI/pizzas.items[i].number_of_slices), BLACK);
+      }
+
+      for (size_t j = 0; j < pizzas.items[i].toppings.count; j++) {
+        Texture2D toppingTexture = toppingsTex[(assert(pizzas.items[i].toppings.items[j].type != TOPPING_NONE), pizzas.items[i].toppings.items[j].type)];
+        float targetWidth = toppingTexture.width * INGREDIENT_SCALE;
+        float targetHeight = toppingTexture.height * INGREDIENT_SCALE;
+        Rectangle rec = {
+          .x = PIZZA_RADIUS + pizzas.items[i].toppings.items[j].offset_from_center * cosf(pizzas.items[i].toppings.items[j].rotation),
+          .y = PIZZA_RADIUS + pizzas.items[i].toppings.items[j].offset_from_center * sinf(pizzas.items[i].toppings.items[j].rotation),
+          .width = targetWidth,
+          .height = targetHeight,
+        };
+        DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height},rec, (Vector2){.x = targetWidth / 2, .y = targetHeight / 2}, pizzas.items[i].toppings.items[j].rotation * RAD2DEG, WHITE);
+      }
+    } EndTextureMode();
+
+    DrawTexturePro(
+      pizzas.items[i].render_tex.texture,
+      (Rectangle){
+        0,
+        0,
+        pizzas.items[i].render_tex.texture.width,
+        -pizzas.items[i].render_tex.texture.height
+      },
+      (Rectangle){
+        pizzas.items[i].position.x,
+        pizzas.items[i].position.y,
+        pizzas.items[i].render_tex.texture.width,
+        pizzas.items[i].render_tex.texture.height
+      },
+      (Vector2){
+          pizzas.items[i].render_tex.texture.width/2.0f,
+          pizzas.items[i].render_tex.texture.height/2.0f
+      },
+      pizzas.items[i].rotation * RAD2DEG,
+      WHITE
+    );
+    DrawTexturePro(
+      pizzaMaskTex,
+      (Rectangle){
+        0,
+        0,
+        pizzas.items[i].render_tex.texture.width,
+        -pizzas.items[i].render_tex.texture.height
+      },
+      (Rectangle){
+        pizzas.items[i].position.x,
+        pizzas.items[i].position.y,
+        pizzas.items[i].render_tex.texture.width,
+        pizzas.items[i].render_tex.texture.height
+      },
+      (Vector2){
+          pizzas.items[i].render_tex.texture.width/2.0f,
+          pizzas.items[i].render_tex.texture.height/2.0f
+      },
+      180,
+      WHITE
+    );
+  }
+}
+
+void DrawOrderTicket(void) {
+  for (size_t i = 0; i < ARRAY_LEN(orderTickets); i++) {
+    BeginTextureMode(orderTickets[i].render_tex); {
+      DrawTexture(blankOrderTicketTex, 0, 0, WHITE);
+      if (rotators[i].active) {
+        size_t order_index = rotators[i].order_index;
+        Order order = orders.items[order_index];
+        Vector2 position = {20, 150};
+        for (size_t j = 0; j < order.requested_toppings.count; j++) {
+          Topping topping = order.requested_toppings.items[j];
+          ToppingPosition topping_position = topping.requested_position;
+
+          DrawTextureEx(
+            toppingPositionIconsTex[(assert(topping_position != TOPPING_POSITION_NONE && topping_position < __topping_position_count && "topping positioning is either none or unkown"), topping_position)],
+            position,
+            0,
+            TOPPING_POSITION_ICON_SCALE,
+            WHITE
+          );
+
+          Texture2D tex = toppingsTex[(assert(topping.type != TOPPING_NONE && topping.type < __topping_type_count && "topping type is either none or unkown inside order"), topping.type)];
+          float scale = 0.3;
+          switch(topping.type) {
+            case TOPPING_MUSHROOM: scale = 0.25; break;
+            case TOPPING_BELL_PEPPER: scale = 0.2; break;
+            default: break;
+          }
+          DrawTexturePro(
+            tex,
+            (Rectangle){
+              0,
+              0,
+              tex.width,
+              tex.height
+            },
+            (Rectangle){
+              position.x + 70,
+              position.y,
+              tex.width * scale,
+              tex.height * scale
+            },
+            (Vector2){0, 0},
+            0,
+            WHITE
+          );
+          position.y += 100;
+        }
+      }
+    } EndTextureMode();
+    DrawTexturePro(
+      orderTickets[i].render_tex.texture,
+      (Rectangle){
+        0,
+        0,
+        orderTickets[i].render_tex.texture.width,
+        -orderTickets[i].render_tex.texture.height
+      },
+      (Rectangle){
+        orderTickets[i].position.x,
+        orderTickets[i].position.y,
+        orderTickets[i].render_tex.texture.width,
+        orderTickets[i].render_tex.texture.height
+      },
+      (Vector2){0, 0},
+      0,
+      WHITE
+    );
+  }
+}
+
+void DrawPickedUpTopping(Vector2 mouse_pos) {
+  if (topping_selected != TOPPING_NONE) {
+    Texture2D toppingTexture = toppingsTex[(assert(topping_selected != TOPPING_NONE), topping_selected)];
+    float targetWidth = toppingTexture.width * INGREDIENT_SCALE * 1.25f;
+    float targetHeight = toppingTexture.height * INGREDIENT_SCALE * 1.25f;
+    Rectangle targetRect = {mouse_pos.x - targetWidth / 2, mouse_pos.y - targetHeight / 2, targetWidth, targetHeight};
+    DrawTexturePro(toppingTexture, (Rectangle){0,0, toppingTexture.width, toppingTexture.height}, targetRect, (Vector2){0,0}, 0, WHITE);
+  }
+}
+
+void DrawTextEffects(void) {
+  for (int i = textEffects.count - 1; i >= 0; i--) {
+    TextEffect textEffect = textEffects.items[i];
+    DrawText(textEffect.text, textEffect.position.x, textEffect.position.y, textEffect.size, (Color){255, 255, 255, textEffect.opacity});
+    textEffects.items[i].opacity -= 2;
+    textEffects.items[i].position.y -= 2;
+    if (textEffects.items[i].opacity <= 0 || textEffects.items[i].position.y + textEffects.items[i].size <= 0 || textEffects.items[i].size <= 3) {
+      da_remove_unordered(&textEffects, i);
+    }
+  }
+}
+
+void DrawTutorial(void) {
+  if (!firstPizzaServed) {
+    DrawTexture(tutorialTex, tutorialX, (SCREEN_HEIGHT - tutorialTex.height) / 2, WHITE);
+  } else if (tutorialX < SCREEN_WIDTH) {
+    tutorialX += 15;
+    DrawTexture(tutorialTex, tutorialX, (SCREEN_HEIGHT - tutorialTex.height) / 2, WHITE);
+  }
 }
