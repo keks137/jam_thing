@@ -236,7 +236,7 @@ void UpdateScore(Pizza pizza, Order order);
 int main()
 {
   srand(time(NULL));
-	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Spinzza");
+	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Pizza Panic");
 
   sprintf(scoreStr, "0");
 
@@ -583,7 +583,7 @@ static void UpdateDrawFrame(void)
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftServeButton)) {
       if (rotators[0].active) {
-        if (!firstPizzaServed) {firstPizzaServed = true;}
+        if (!firstPizzaServed) firstPizzaServed = true;
         rotators[0].spinning = false;
         rotators[0].active = false;
         orders.items[rotators[0].order_index].completed = true;
@@ -595,7 +595,7 @@ static void UpdateDrawFrame(void)
     }
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightServeButton)) {
       if (rotators[1].active) {
-        if (!firstPizzaServed) {firstPizzaServed = true;}
+        if (!firstPizzaServed) firstPizzaServed = true;
         rotators[1].spinning = false;
         rotators[1].active = false;
         orders.items[rotators[1].order_index].completed = true;
@@ -862,8 +862,7 @@ static void UpdateDrawFrame(void)
           rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.1);
     } else if (right_arm_target_rot != 0) {
         rightArmAngle = right_arm_target_rot;
-    } 
-    else {
+    } else {
       rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.05);
     }
 
@@ -883,7 +882,6 @@ static void UpdateDrawFrame(void)
 		    (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
 		    (Vector2){ 40, robotArmRight.height / 2.0f}, 
 		    rightArmAngle , WHITE);
-    }
 
 
     for (int i = textEffects.count - 1; i >= 0; i--) {
@@ -903,8 +901,8 @@ static void UpdateDrawFrame(void)
     } else if (tutorialX < SCREEN_WIDTH)
       tutorialX += 15;
       DrawTexture(tutorialTex, tutorialX, (SCREEN_HEIGHT - tutorialTex.height) / 2, WHITE);
-    } 
-    EndDrawing();
+    }
+  } EndDrawing();
 }
 
 void UpdateScore(Pizza pizza, Order order) {
@@ -1151,6 +1149,7 @@ void UpdateScore(Pizza pizza, Order order) {
       default: assert(false && "Topping position is unkown in order");
     }
   }
+
   int scoreChange = score - startScore;
   da_append(&textEffects, ((TextEffect){.text = "", .opacity = 255, .position =(Vector2){852, 619 - 30}, .size = 60}));
   snprintf(textEffects.items[textEffects.count - 1].text, sizeof(textEffects.items[textEffects.count - 1].text), "%d", scoreChange);

@@ -328,6 +328,17 @@ bool build_web(Nob_Cmd *cmd)
 	return true;
 }
 
+bool package_web(Nob_Cmd *cmd) {
+  cmd_append(cmd, "zip");
+  cmd_append(cmd, "-r", BIN_DIR"pizza-panic.zip");
+  cmd_append(cmd, BIN_DIR"index.html");
+  cmd_append(cmd, BIN_DIR"index.js");
+  cmd_append(cmd, BIN_DIR"index.wasm");
+	if (!cmd_run(cmd))
+		return false;
+  return true;
+}
+
 bool build_msvc(Nob_Cmd *cmd)
 {
 	if (!nob_file_exists(BUILD_DIR "raylib_msvc/raylib.lib")) {
@@ -375,6 +386,8 @@ bool build()
 	if (web) {
 		if (!build_web(&cmd))
 			return false;
+    if (!package_web(&cmd))
+      return false;
 	} else {
 		if (!build_linux(&cmd))
 			return false;
