@@ -237,6 +237,7 @@ bool firstPizzaServed = false;
 
 int startTime;
 bool timerActive = false;
+bool updateTimer = false;
 
 static void UpdateDrawFrame(void);
 void UpdateScore(Pizza pizza, Order order);
