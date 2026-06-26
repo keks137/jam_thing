@@ -227,7 +227,6 @@ Font summer_font;
 float ptrRotation = -117; // 113
 
 size_t score = 0;
-char scoreStr[64];
 bool firstPizzaServed = false;
 
 static void UpdateDrawFrame(void);
@@ -250,8 +249,6 @@ int main()
 {
   srand(time(NULL));
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Pizza Panic");
-
-  sprintf(scoreStr, "0");
 
   summer_font = LoadFont(SUMMER_FONT);
 
@@ -414,7 +411,7 @@ static void UpdateDrawFrame(void)
 
     DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
 
-    DrawText(scoreStr, 852, 619, 70, YELLOW);
+    DrawText(TextFormat("%d", score), 852, 619, 70, YELLOW);
 
     UpdateAndDrawSpeedControllers(mouse_pos);
 
@@ -422,9 +419,9 @@ static void UpdateDrawFrame(void)
 
     DrawOrderTicket();
 
-    DrawPickedUpTopping(mouse_pos);
-
     DrawRobotArms();
+
+    DrawPickedUpTopping(mouse_pos);
 
     DrawTextEffects();
 
@@ -680,7 +677,6 @@ void UpdateScore(Pizza pizza, Order order) {
   int scoreChange = score - startScore;
   da_append(&textEffects, ((TextEffect){.text = "", .opacity = 255, .position =(Vector2){852, 619 - 30}, .size = 60}));
   snprintf(textEffects.items[textEffects.count - 1].text, sizeof(textEffects.items[textEffects.count - 1].text), "%d", scoreChange);
-  sprintf(scoreStr, "%zu", score);
 }
 
 void UpdateOrders(double time) {
@@ -925,11 +921,13 @@ void DrawConveyorBelt(float dt) {
 
 void DrawRobotArms(void) {
   {
-    Vector2 left_arm_pos = {820,385};
-    // float left_arm_target_rot = 0;
+    Vector2 left_arm_attached_pos = {820,385};
+    Vector2 left_arm_attached_rod_pos = {820 - leftArmBearing.width*2.1, 385 - leftArmBearing.height/2};
+    Vector2 left_arm_rotating_part_pos = {675, left_arm_attached_rod_pos.y + leftArmBearing.height/2};
+    float left_arm_target_rot = 95;
     // if (mouse_pos.x <= left_arm_pos.x) left_arm_target_rot = atan2f(left_arm_pos.y - mouse_pos.y,  left_arm_pos.x - mouse_pos.x ) * RAD2DEG;
-    //    // DrawText(TextFormat("%f",left_arm_angle),0,0,30,YELLOW);
-    // left_arm_target_rot = Clamp(left_arm_target_rot, -90, 90);
+    DrawText(TextFormat("%f",left_arm_target_rot),0,0,30,YELLOW);
+    left_arm_target_rot = Clamp(left_arm_target_rot, -75, 95);
     // if (fabsf(left_arm_target_rot - leftArmAngle) > 45) {
     //       leftArmAngle = Lerp(leftArmAngle, left_arm_target_rot, 0.1);
     // } else if (left_arm_target_rot != 0) {
@@ -950,13 +948,55 @@ void DrawRobotArms(void) {
     //   robotArmLeft = leftArmRenderTex.texture;
     // }
 
-    DrawTexturePro( robotArmLeft, (Rectangle){0, 0, robotArmLeft.width, robotArmLeft.height},
-      (Rectangle){left_arm_pos.x, left_arm_pos.y, robotArmLeft.width, robotArmLeft.height},
-      (Vector2){robotArmLeft.width - 40, robotArmLeft.height / 2.0f}, 
-      leftArmAngle , WHITE);
+    DrawTextureV(leftArmBearing, (Vector2){left_arm_attached_pos.x-leftArmBearing.width/2, left_arm_attached_pos.y-leftArmBearing.height/2}, WHITE);
+
+    DrawTexturePro(
+      leftArmRod,
+      (Rectangle){
+        0,
+        0,
+        leftArmRod.width,
+        leftArmRod.height
+      },
+      (Rectangle){
+        left_arm_attached_rod_pos.x,
+        left_arm_attached_rod_pos.y,
+        leftArmRod.width*3,
+        leftArmRod.height
+      },
+      (Vector2){0, 0},
+      0,
+      WHITE
+    );
+
+    DrawTexturePro(
+      robotArmLeft,
+      (Rectangle){
+        0, 
+        0,
+        robotArmLeft.width,
+        robotArmLeft.height
+      },
+      (Rectangle){
+        left_arm_rotating_part_pos.x,
+        left_arm_rotating_part_pos.y,
+        robotArmLeft.width,
+        robotArmLeft.height
+      },
+      (Vector2){
+        robotArmLeft.width - 40,
+        robotArmLeft.height/2,
+      },
+      left_arm_target_rot,
+      WHITE
+    );
+    // DrawTexturePro( leftArmBearing, (Rectangle){0, 0, robotArmLeft.width, robotArmLeft.height},
+    //   (Rectangle){left_arm_attached_pos.x, left_arm_attached_pos.y, leftArmBearing.width, leftArmBearing.height},
+    //   (Vector2){leftArmBearing.width - 40, leftArmBearing.height / 2.0f}, 
+    //   180 , WHITE);
   }
   {
-    Vector2 right_arm_pos = {1090,385};
+    Vector2 right_arm_attached_bearing_pos = {1090,385};
 
     // float right_arm_target_rot = 0;
     // if (mouse_pos.x >= right_arm_pos.x) right_arm_target_rot = atan2f( mouse_pos.y - right_arm_pos.y ,   mouse_pos.x - right_arm_pos.x  ) * RAD2DEG;
@@ -983,10 +1023,11 @@ void DrawRobotArms(void) {
     //   robotArmRight = rightArmRenderTex.texture;
     // }
 
-    DrawTexturePro( robotArmRight, (Rectangle){0, 0, robotArmRight.width, robotArmRight.height},
-      (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
-      (Vector2){ 40, robotArmRight.height / 2.0f}, 
-      rightArmAngle , WHITE);
+    // DrawTexturePro( robotArmRight, (Rectangle){0, 0, robotArmRight.width, robotArmRight.height},
+    //   (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
+    //   (Vector2){ 40, robotArmRight.height / 2.0f}, 
+    //   rightArmAngle , WHITE);
+    DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_bearing_pos.x-rightArmBearing.width/2, right_arm_attached_bearing_pos.y-rightArmBearing.height/2}, WHITE);
   }
 }
 
