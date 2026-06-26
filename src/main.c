@@ -159,9 +159,9 @@ typedef struct {
 TextEffects textEffects = {0};
 
 
-GamePhase game_phase = EARLY_PHASE;
+GamePhase game_phase = START_SCREEN;
 float start_time = 0;
-float game_phase_time = 0;
+float phase_start_time = 0;
 
 PizzaRotator rotators[2] = {
   {.rotation_speed = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}},
@@ -228,6 +228,8 @@ float ptrRotation = -117; // 113
 
 size_t score = 0;
 bool firstPizzaServed = false;
+
+bool updateTimer = false;
 
 static void UpdateDrawFrame(void);
 void UpdateScore(Pizza pizza, Order order);
@@ -349,27 +351,31 @@ static void UpdateDrawFrame(void)
 
   switch (game_phase) {
     case START_SCREEN: {
-
+      game_phase = EARLY_PHASE;
+      updateTimer = true;
+      start_time = time;
+      phase_start_time = start_time;
     } break;
     case EARLY_PHASE: {
-      if (time - game_phase_time >= EARLY_PHASE_TIME) {
+      if (time - phase_start_time >= EARLY_PHASE_TIME) {
         game_phase = MIDDLE_PHASE;
         max_active_orders = 2;
         conveyor_belt.speed = MIDDLE_PHASE_CONVEYOR_BELT_SPEED;
-        game_phase_time = time;
+        phase_start_time = time;
       }
     } break;
     case MIDDLE_PHASE: {
-      if (time  - game_phase_time >= MIDDLE_PHASE_TIME) {
+      if (time  - phase_start_time >= MIDDLE_PHASE_TIME) {
         game_phase = END_PHASE;
         conveyor_belt.speed = END_PHASE_CONVEYOR_BELT_SPEED;
-        game_phase_time = time;
+        phase_start_time = time;
       }
     } break;
     case END_PHASE: {
-      if (time - game_phase_time >= END_PHASE_TIME) {
+      if (time - phase_start_time >= END_PHASE_TIME) {
         game_phase = RESULTS_DISPLAY;
         max_active_orders = 0;
+        updateTimer = false;
       }
 
     } break;
@@ -377,6 +383,9 @@ static void UpdateDrawFrame(void)
 
     } break;
   }
+
+  if (updateTimer)
+    ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
 
   UpdateOrders(time);
 
@@ -393,8 +402,6 @@ static void UpdateDrawFrame(void)
   PlaceToppingOnPizza(mouse_pos);
 
   TossOrServe(mouse_pos, time);
-
-  ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
 
 	BeginDrawing(); {
     ClearBackground(WHITE);
