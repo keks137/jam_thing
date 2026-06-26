@@ -38,6 +38,15 @@
 #define PIZZA_ICON_FULL_IMG          ASSETS_DIR "pizza-icon-full.png"
 #define PIZZA_ICON_TOP_IMG           ASSETS_DIR "pizza-icon-top.png"
 
+#define LEFT_CLAW_HEAD_IMG ASSETS_DIR "left-claw-head.png"
+#define LEFT_CLAW_ROD_IMG ASSETS_DIR "left-claw-rod.png"
+#define LEFT_CLAW_BEARING_IMG ASSETS_DIR "left-claw-bearing.png"
+#define RIGHT_CLAW_HEAD_IMG ASSETS_DIR "right-claw-head.png"
+#define RIGHT_CLAW_ROD_IMG ASSETS_DIR "right-claw-rod.png"
+#define RIGHT_CLAW_BEARING_IMG ASSETS_DIR "right-claw-bearing.png"
+
+#define TUTORIAL_IMG ASSETS_DIR "tutorial.png"
+
 #define SUMMER_FONT ASSETS_DIR "Summer-4nx3W.ttf"
 
 #endif // ASSETS_H_
