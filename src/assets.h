@@ -55,6 +55,7 @@
 #define ORDER_OUT_SFX ASSETS_DIR "orderOut.mp3"
 #define PLACE_INGREDIENT_SFX ASSETS_DIR "splat.mp3"
 #define CHANGE_KNOB_SFX ASSETS_DIR "knob3.mp3"
+#define RETRO_MUSIC ASSETS_DIR "retro_arcade1.mp3"
 
 #endif // ASSETS_H_
 

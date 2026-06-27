@@ -222,6 +222,8 @@ Sound newPizza;
 Sound placeIngredient;
 Sound changeKnob;
 
+Music retroMusic;
+
 Texture2D conveyorBeltFrames[3];
 int currentBeltFrame = 0;
 float beltTimer = 0;
@@ -261,6 +263,8 @@ char* titles[6] = {
   "Topping Titan! (B)",
   "Superior Spin Master! (A)"
 };
+
+bool musicPlaying = false;
 
 void Reset(void);
 static void UpdateDrawFrame(void);
@@ -367,6 +371,10 @@ int main()
   newPizza = LoadSound(ORDER_IN_SFX);
   placeIngredient = LoadSound(PLACE_INGREDIENT_SFX);
   changeKnob = LoadSound(CHANGE_KNOB_SFX);
+
+  retroMusic = LoadMusicStream(RETRO_MUSIC);
+  retroMusic.looping = true;
+  
 
   summer_font = LoadFont(SUMMER_FONT);
   cheese_font = LoadFontEx(CHEESE_FONT, 150, NULL, 0);
@@ -514,7 +522,11 @@ static void UpdateDrawFrame(void)
   float dt = GetFrameTime();
   Vector2 mouse_pos = GetMousePosition();
   double time = GetTime();
+  if (IsMouseButtonDown(0) && !musicPlaying) {
+      PlayMusicStream(retroMusic);
+      musicPlaying = true;
 
+  }
   switch (game_phase) {
     case START_SCREEN: {
       game_phase = TUTORIAL_PHASE;
@@ -611,7 +623,7 @@ static void UpdateDrawFrame(void)
   if (IsKeyPressed(KEY_R)) {
     game_phase = RESULTS_DISPLAY;
   }
-
+  UpdateMusicStream(retroMusic);
 	BeginDrawing(); {
     ClearBackground(WHITE);
     
