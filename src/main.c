@@ -49,10 +49,11 @@ typedef enum {
   TOPPING_CORN,
   TOPPING_FETA,
   TOPPING_SPINACH,
+  TOPPING_ONION,
   __topping_type_count
 } ToppingType;
 
-#define TOPPING_POSITION_ICON_SCALE 1.5
+#define TOPPING_POSITION_ICON_SCALE 0.6
 
 typedef enum {
   TOPPING_POSITION_NONE,
@@ -420,6 +421,7 @@ int main()
   toppingsTex[TOPPING_CORN] = LoadTexture(CORN_IMG);
   toppingsTex[TOPPING_FETA] = LoadTexture(FETA_IMG);
   toppingsTex[TOPPING_SPINACH] = LoadTexture(SPINACH_IMG);
+  toppingsTex[TOPPING_ONION] = LoadTexture(ONION_IMG);
 
   toppingPositionIconsTex[TOPPING_POSITION_FULL] = LoadTexture(PIZZA_ICON_FULL_IMG);
   toppingPositionIconsTex[TOPPING_POSITION_HALF1] = LoadTexture(PIZZA_ICON_TOP_IMG);
@@ -622,9 +624,9 @@ static void UpdateDrawFrame(void)
     }
   }
   
-  if (IsKeyPressed(KEY_R)) {
-    game_phase = RESULTS_DISPLAY;
-  }
+  // if (IsKeyPressed(KEY_R)) {
+  //   game_phase = RESULTS_DISPLAY;
+  // }
   UpdateMusicStream(retroMusic);
 	BeginDrawing(); {
     ClearBackground(WHITE);
@@ -811,6 +813,7 @@ void UpdateOrders(double time) {
     da_append(&available_toppings, ((Topping){.type = TOPPING_CORN}));
     da_append(&available_toppings, ((Topping){.type = TOPPING_FETA}));
     da_append(&available_toppings, ((Topping){.type = TOPPING_SPINACH}));
+    da_append(&available_toppings, ((Topping){.type = TOPPING_ONION}));
 
     int prob = rand() % 1000 + 1;
     Topping topping = {0};

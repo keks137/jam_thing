@@ -4,6 +4,8 @@
 
 #define ASSETS_DIR "assets/"
 
+#define TITLE_SCREEN_IMG ASSETS_DIR "title-screen.png"
+
 #define BACKGROUND_IMG ASSETS_DIR "background.png"
 
 #define SPEED_CONTROLLER_IMG ASSETS_DIR "speed-control-slider.png"
@@ -27,6 +29,7 @@
 #define CORN_IMG ASSETS_DIR         "corn.png"
 #define FETA_IMG ASSETS_DIR         "feta.png"
 #define SPINACH_IMG ASSETS_DIR      "spinach.png"
+#define ONION_IMG ASSETS_DIR        "onion.png"
 
 #define TOSS_BUTTON_IMG ASSETS_DIR    "toss-button.png"
 #define SERVER_BUTTON_IMG ASSETS_DIR  "serve-button.png"
