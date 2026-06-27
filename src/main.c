@@ -222,6 +222,8 @@ Sound newPizza;
 Sound placeIngredient;
 Sound changeKnob;
 
+Texture2D startScreen;
+
 Music retroMusic;
 
 Texture2D conveyorBeltFrames[3];
@@ -265,6 +267,7 @@ char* titles[6] = {
 };
 
 bool musicPlaying = false;
+bool begin = false;
 
 void Reset(void);
 static void UpdateDrawFrame(void);
@@ -306,6 +309,7 @@ void Reset() {
   pizzasTossed = 0;
   textEffects.count = 0;
   printf("RESETTING\n");
+  begin = false;
 
   game_phase = START_SCREEN;
   start_time = 0;
@@ -377,6 +381,7 @@ int main()
   retroMusic = LoadMusicStream(RETRO_MUSIC);
   retroMusic.looping = true;
   
+  startScreen = LoadTexture(TITLE_SCREEN_IMG);
 
   summer_font = LoadFont(SUMMER_FONT);
   cheese_font = LoadFontEx(CHEESE_FONT, 150, NULL, 0);
@@ -519,6 +524,12 @@ void DrawEndScreen() {
   }
 }
 
+void DrawStartScreen() {
+  DrawTexture(startScreen, 0, 0, WHITE);
+  if (IsMouseButtonPressed(0)) {
+    begin = true;
+  }
+}
 static void UpdateDrawFrame(void)
 {
   float dt = GetFrameTime();
@@ -531,9 +542,12 @@ static void UpdateDrawFrame(void)
   }
   switch (game_phase) {
     case START_SCREEN: {
-      game_phase = TUTORIAL_PHASE;
-      updateTimer = false;
-      phase_start_time = start_time;
+      if (begin) {
+        game_phase = TUTORIAL_PHASE;
+        updateTimer = false;
+        phase_start_time = start_time;
+      }
+      
     } break;
     case TUTORIAL_PHASE: {
       if (firstPizzaServed) {
@@ -622,9 +636,7 @@ static void UpdateDrawFrame(void)
     }
   }
   
-  if (IsKeyPressed(KEY_R)) {
-    game_phase = RESULTS_DISPLAY;
-  }
+  
   UpdateMusicStream(retroMusic);
 	BeginDrawing(); {
     ClearBackground(WHITE);
@@ -662,6 +674,9 @@ static void UpdateDrawFrame(void)
 
     if (game_phase == RESULTS_DISPLAY) {
       DrawEndScreen();
+    }
+    if (game_phase == START_SCREEN) {
+      DrawStartScreen();
     }
   } EndDrawing();
 

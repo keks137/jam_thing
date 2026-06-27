@@ -57,6 +57,8 @@
 #define CHANGE_KNOB_SFX ASSETS_DIR "knob3.mp3"
 #define RETRO_MUSIC ASSETS_DIR "retro_arcade1.mp3"
 
+#define TITLE_SCREEN_IMG ASSETS_DIR "title-screen.png"
+
 #endif // ASSETS_H_
 
 
