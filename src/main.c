@@ -857,7 +857,7 @@ void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
   int scoreChange = BASE_SCORE * final_accuracy * pizza_type_multiplier * speed_multiplier;
   TextEffect effect = {
     .opacity = 255, 
-    .position =(Vector2){852, 619 - 30},
+    .position =(Vector2){SCREEN_WIDTH/2.0, 619 - 30},
     .size = 60
   };
   snprintf(effect.text, sizeof(effect.text), "%zu", score);
@@ -1488,7 +1488,8 @@ void DrawPickedUpTopping(Vector2 mouse_pos) {
 void DrawTextEffects(void) {
   for (int i = textEffects.count - 1; i >= 0; i--) {
     TextEffect textEffect = textEffects.items[i];
-    DrawText(textEffect.text, textEffect.position.x, textEffect.position.y, textEffect.size, (Color){255, 255, 255, textEffect.opacity});
+    int textSize = MeasureText(textEffect.text, textEffect.size);
+    DrawText(textEffect.text, textEffect.position.x - textSize / 2.0, textEffect.position.y, textEffect.size, (Color){255, 255, 255, textEffect.opacity});
     textEffects.items[i].opacity -= 2;
     textEffects.items[i].position.y -= 2;
     if (textEffects.items[i].opacity <= 0 || textEffects.items[i].position.y + textEffects.items[i].size <= 0 || textEffects.items[i].size <= 3) {
