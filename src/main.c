@@ -823,8 +823,8 @@ void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
         for (size_t j = 0; j < ARRAY_LEN(alternate_slice_comparators); j++) {
           unsigned char expected = alternate_slice_comparators[j];
           unsigned char actual = toppings_present_on_slice[current_topping.type];
-          size_t correct = pizza.number_of_slices - countSetBits(expected ^ actual);
-          float acc = CalculateAccuracy(correct, current_topping.requested_position);
+          size_t matched = countSetBits(expected & actual);
+          float acc = CalculateAccuracy(matched, current_topping.requested_position);
           if (acc > best_acc) {
               best_acc = acc;
               matched_pattern = j;
@@ -1160,7 +1160,6 @@ void TossOrServe(Vector2 mouse_pos, double time) {
   }
   
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftServeButton)) {
-    printf("pressed\n");
     if (rotators[0].active) {
       pizzasFinished++;
       PlaySound(newPizza);
