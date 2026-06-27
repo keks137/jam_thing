@@ -151,7 +151,7 @@ typedef struct {
 } ConveyorBelt;
 
 typedef struct {
-  char text[64];
+  const char* text;
   Vector2 position;
   int size;
   int opacity;
@@ -280,25 +280,27 @@ void DrawTextEffects(void);
 void DrawTutorial(void);
 
 float easeOutBounce(float x) {
-  float n1 = 7.5625;
-  float d1 = 2.75;
+  const float n1 = 7.5625f;
+  const float d1 = 2.75f;
 
-  if (x < 1 / d1) {
-      return n1 * x * x;
-  } else if (x < 2 / d1) {
-      return n1 * (x -= 1.5 / d1) * x + 0.75;
-  } else if (x < 2.5 / d1) {
-      return n1 * (x -= 2.25 / d1) * x + 0.9375;
+  if (x < 1.0f / d1) {
+    return n1 * x * x;
+  } else if (x < 2.0f / d1) {
+    x -= 1.5f / d1;
+    return n1 * x * x + 0.75f;
+  } else if (x < 2.5f / d1) {
+    x -= 2.25f / d1;
+    return n1 * x * x + 0.9375f;
   } else {
-      return n1 * (x -= 2.625 / d1) * x + 0.984375;
+    x -= 2.625f / d1;
+    return n1 * x * x + 0.984375f;
   }
-
 }
 
 void Reset() {
   pizzasFinished = 0;
   pizzasTossed = 0;
-  TextEffects textEffects = {0};
+  textEffects.count = 0;
   printf("RESETTING\n");
 
   game_phase = START_SCREEN;
@@ -474,9 +476,9 @@ void DrawEndScreen() {
   Vector2 tossedSize = MeasureTextEx(cheese_font, TextFormat("Pizzas Tossed: %d", pizzasTossed), 40, 3);
   Vector2 scoreSize = MeasureTextEx(cheese_font, TextFormat("Final Score: %d", score), 40, 3);
 
-  DrawTextEx(cheese_font, TextFormat("Pizzas Finished: %d", pizzasFinished), (Vector2){SCREEN_WIDTH / 2 - finishedSize.x / 2, topY + 200}, 40, 3, (Color){109, 61, 37, 255});
-  DrawTextEx(cheese_font, TextFormat("Pizzas Tossed: %d", pizzasTossed), (Vector2){SCREEN_WIDTH / 2 - tossedSize.x / 2, topY + 240}, 40, 3, (Color){109, 61, 37, 255});
-  DrawTextEx(cheese_font, TextFormat("Final Score: %d", score), (Vector2){SCREEN_WIDTH / 2 - scoreSize.x / 2, topY + 280}, 40, 3, (Color){109, 61, 37, 255});
+  DrawTextEx(cheese_font, TextFormat("Pizzas Finished: %d", pizzasFinished), (Vector2){SCREEN_WIDTH / 2.0f - finishedSize.x / 2, topY + 200}, 40, 3, (Color){109, 61, 37, 255});
+  DrawTextEx(cheese_font, TextFormat("Pizzas Tossed: %d", pizzasTossed), (Vector2){SCREEN_WIDTH / 2.0f - tossedSize.x / 2, topY + 240}, 40, 3, (Color){109, 61, 37, 255});
+  DrawTextEx(cheese_font, TextFormat("Final Score: %d", score), (Vector2){SCREEN_WIDTH / 2.0f - scoreSize.x / 2, topY + 280}, 40, 3, (Color){109, 61, 37, 255});
 
   int titleI = 0;
   if (score < 150) {
@@ -494,14 +496,14 @@ void DrawEndScreen() {
   }
 
   Vector2 prefaceSize = MeasureTextEx(cheese_font, "You have earned the title: ", 25, 2);
-    DrawTextEx(cheese_font, "You have earned the title: ", (Vector2){SCREEN_WIDTH / 2 - prefaceSize.x / 2, topY + 380}, 25, 2, (Color){109, 61, 37, 255});
+    DrawTextEx(cheese_font, "You have earned the title: ", (Vector2){SCREEN_WIDTH / 2.0f - prefaceSize.x / 2, topY + 380}, 25, 2, (Color){109, 61, 37, 255});
 
 
   Vector2 titleSize = MeasureTextEx(cheese_font, titles[titleI], 50, 4);
-  DrawTextEx(cheese_font, titles[titleI], (Vector2){SCREEN_WIDTH / 2 - titleSize.x / 2, topY + 420}, 50, 4, (Color){109, 61, 37, 255});
+  DrawTextEx(cheese_font, titles[titleI], (Vector2){SCREEN_WIDTH / 2.0 - titleSize.x / 2, topY + 420}, 50, 4, (Color){109, 61, 37, 255});
 
 
-  Rectangle resetButton = (Rectangle){SCREEN_WIDTH / 2 - scoreboardTex.width / 2 + 256, SCREEN_HEIGHT / 2 - scoreboardTex.height / 2 + 511, 208, 79};
+  Rectangle resetButton = (Rectangle){SCREEN_WIDTH / 2.0 - scoreboardTex.width / 2.0 + 256, SCREEN_HEIGHT / 2.0 - scoreboardTex.height / 2.0 + 511, 208, 79};
   Vector2 mousePos = GetMousePosition();
 
   if (CheckCollisionPointRec(mousePos, resetButton) && IsMouseButtonPressed(0)) {
@@ -700,6 +702,7 @@ void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
 
   for (size_t i = 0; i < order.requested_toppings.count; i++) {
     Topping current_topping = order.requested_toppings.items[i];
+    if (toppings_present_on_slice[current_topping.type] == 0) continue;
 
     switch (current_topping.requested_position) {
       case TOPPING_POSITION_NONE: assert(false && "topping position in order should not be none");
@@ -726,6 +729,7 @@ void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
           }
         }
         pattern_accuracy += best_acc;
+
         size_t other_topping = i == 0 ? 1 : 0;
         if (i < other_topping && order.requested_toppings.items[other_topping].requested_position != TOPPING_POSITION_FULL) {
           size_t contanimated_slices = countSetBits(half_slice_comparators[matched_pattern] & toppings_present_on_slice[order.requested_toppings.items[other_topping].type]);
@@ -769,15 +773,13 @@ void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
     default: assert(false && "unkown speed setting");
   }
 
-  pattern_accuracy = fmin(pattern_accuracy, 1.0f);
+  pattern_accuracy = pattern_accuracy / order.requested_toppings.count;
   pizza_type_multiplier /= order.requested_toppings.count;
   float final_accuracy = fmax(0, pattern_accuracy - contanimation_penalty);
   int scoreChange = BASE_SCORE * final_accuracy * pizza_type_multiplier * speed_multiplier;
-  printf("pattern_accuracy = %f, contanimation_penalty = %f, final_accuracy = %f, pizza_type_multiplier %f, speed_multiplier = %f, score = %d", pattern_accuracy, contanimation_penalty, final_accuracy, pizza_type_multiplier, speed_multiplier, scoreChange);
   score += scoreChange;
 
-  da_append(&textEffects, ((TextEffect){.text = "", .opacity = 255, .position =(Vector2){852, 619 - 30}, .size = 60}));
-  snprintf(textEffects.items[textEffects.count - 1].text, sizeof(textEffects.items[textEffects.count - 1].text), "%d", scoreChange);
+  da_append(&textEffects, ((TextEffect){.text = TextFormat("%d", scoreChange), .opacity = 255, .position =(Vector2){852, 619 - 30}, .size = 60}));
 }
 
 void UpdateOrders(double time) {
@@ -1124,7 +1126,7 @@ void DrawRobotArms(void) {
       0,
       WHITE
     );
-    DrawTextureV(leftArmBearing, (Vector2){left_arm_attached_pos.x-leftArmBearing.width/2, left_arm_attached_pos.y-leftArmBearing.height/2}, WHITE);
+    DrawTextureV(leftArmBearing, (Vector2){left_arm_attached_pos.x-leftArmBearing.width/2.0, left_arm_attached_pos.y-leftArmBearing.height/2.0}, WHITE);
     DrawTexturePro(
       robotArmLeft,
       (Rectangle){
@@ -1148,18 +1150,17 @@ void DrawRobotArms(void) {
     );
 
     Vector2 right_arm_attached_pos = {1099,385};
-    Vector2 right_arm_attached_rod_pos = {1099, 385 - rightArmBearing.height/2};
-    Vector2 right_arm_rotating_part_pos = {1244, right_arm_attached_rod_pos.y + rightArmBearing.height/2};
+    Vector2 right_arm_attached_rod_pos = {1099, 385 - rightArmBearing.height/2.0};
+    Vector2 right_arm_rotating_part_pos = {1244, right_arm_attached_rod_pos.y + rightArmBearing.height/2.0};
     float right_arm_target_rot = 180;
     if (GetMouseX() >= right_arm_attached_pos.x) right_arm_target_rot = atan2f(right_arm_rotating_part_pos.y - GetMouseY(),  right_arm_rotating_part_pos.x - GetMouseX() ) * RAD2DEG;
-    DrawText(TextFormat("%f",right_arm_target_rot),0,0,30,YELLOW);
+    // DrawText(TextFormat("%f",right_arm_target_rot),0,0,30,YELLOW);
     right_arm_target_rot = (int)right_arm_target_rot % 360;
     right_arm_target_rot = (right_arm_target_rot >= 85) ? right_arm_target_rot : (right_arm_target_rot <= -85) ? right_arm_target_rot : -85;
    
-
     
 
-    DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_pos.x-rightArmBearing.width/2, right_arm_attached_pos.y-rightArmBearing.height/2}, WHITE);
+    DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_pos.x-rightArmBearing.width/2.0, right_arm_attached_pos.y-rightArmBearing.height/2.0}, WHITE);
 
     DrawTexturePro(
       rightArmRod,
@@ -1196,7 +1197,7 @@ void DrawRobotArms(void) {
       },
       (Vector2){
         robotArmRight.width - 40,
-        robotArmRight.height/2,
+        robotArmRight.height/2.0,
       },
       right_arm_target_rot,
       WHITE
