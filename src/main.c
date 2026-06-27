@@ -215,6 +215,11 @@ Texture2D rightArmHead;
 Texture2D rightArmRod;
 Texture2D rightArmBearing;
 
+Sound tossPizza;
+Sound newPizza;
+Sound placeIngredient;
+Sound changeKnob;
+
 Texture2D conveyorBeltFrames[3];
 int currentBeltFrame = 0;
 float beltTimer = 0;
@@ -353,6 +358,13 @@ int main()
 {
   srand(time(NULL));
 	InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Pizza Panic");
+
+  //InitAudioDevice();
+
+  //tossPizza = LoadSound(ORDER_OUT_SFX);
+  //newPizza = LoadSound(ORDER_IN_SFX);
+  //placeIngredient = LoadSound(PLACE_INGREDIENT_SFX);
+  //changeKnob = LoadSound(CHANGE_KNOB_SFX);
 
   summer_font = LoadFont(SUMMER_FONT);
   cheese_font = LoadFontEx(CHEESE_FONT, 150, NULL, 0);
@@ -1072,6 +1084,7 @@ void PlaceToppingOnPizza(Vector2 mouse_pos) {
         .requested_position = TOPPING_POSITION_NONE
       }; 
       da_append(&pizzas.items[rotators[i].pizza_index].toppings, topping);
+      //PlaySound(placeIngredient);
     }
     topping_selected = TOPPING_NONE;
   }
@@ -1086,6 +1099,7 @@ void TossOrServe(Vector2 mouse_pos, double time) {
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftTossButton)) {
     if (rotators[0].active) {
       pizzasTossed++;
+      //PlaySound(tossPizza);
       pizzas.items[rotators[0].pizza_index].rotation = 0;
       pizzas.items[rotators[0].pizza_index].toppings.count = 0;
     }
@@ -1094,15 +1108,17 @@ void TossOrServe(Vector2 mouse_pos, double time) {
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightTossButton)) {
     if (rotators[1].active) {
       pizzasTossed++;
+      //PlaySound(tossPizza);
       pizzas.items[rotators[1].pizza_index].rotation = 0;
       pizzas.items[rotators[1].pizza_index].toppings.count = 0;
       
     }
   }
-
+  
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftServeButton)) {
     if (rotators[0].active) {
       pizzasFinished++;
+      //PlaySound(newPizza);
       if (!firstPizzaServed) firstPizzaServed = true;
       rotators[0].spinning = false;
       rotators[0].active = false;
@@ -1115,8 +1131,8 @@ void TossOrServe(Vector2 mouse_pos, double time) {
   }
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightServeButton)) {
     if (rotators[1].active) {
-            pizzasFinished++;
-
+      pizzasFinished++;
+      //PlaySound(newPizza);
       if (!firstPizzaServed) firstPizzaServed = true;
       rotators[1].spinning = false;
       rotators[1].active = false;

@@ -51,6 +51,11 @@
 #define SUMMER_FONT ASSETS_DIR "Summer-4nx3W.ttf"
 #define CHEESE_FONT ASSETS_DIR "FreeCheese-dryYR.ttf"
 
+#define ORDER_IN_SFX ASSETS_DIR "orderIn.mp3"
+#define ORDER_OUT_SFX ASSETS_DIR "orderOut.mp3"
+#define PLACE_INGREDIENT_SFX ASSETS_DIR "splat.mp3"
+#define CHANGE_KNOB_SFX ASSETS_DIR "knob3.mp3"
+
 #endif // ASSETS_H_
 
 
