@@ -256,7 +256,6 @@ bool firstPizzaServed = false;
 
 int startTime;
 bool timerActive = false;
-bool updateTimer = false;
 
 char* titles[6] = {
   "Certified Dough Brain! (F)",
@@ -270,8 +269,9 @@ char* titles[6] = {
 bool musicPlaying = false;
 bool begin = false;
 
-void Reset(void);
 static void UpdateDrawFrame(void);
+void LoadAssets(void);
+void UnloadAssets(void);
 void UpdateScore(Pizza pizza, Order order, size_t speed_setting);
 void UpdateOrders(double time);
 void UpdateConveyorBelt(void);
@@ -286,86 +286,10 @@ void DrawOrderTicket(void);
 void DrawPickedUpTopping(Vector2 mouse_pos);
 void DrawTextEffects(void);
 void DrawTutorial(void);
+void Reset(void);
+void DrawEndScreen(void);
+void DrawStartScreen(void);
 
-float easeOutBounce(float x) {
-  const float n1 = 7.5625f;
-  const float d1 = 2.75f;
-
-  if (x < 1.0f / d1) {
-    return n1 * x * x;
-  } else if (x < 2.0f / d1) {
-    x -= 1.5f / d1;
-    return n1 * x * x + 0.75f;
-  } else if (x < 2.5f / d1) {
-    x -= 2.25f / d1;
-    return n1 * x * x + 0.9375f;
-  } else {
-    x -= 2.625f / d1;
-    return n1 * x * x + 0.984375f;
-  }
-}
-
-void Reset() {
-  pizzasFinished = 0;
-  pizzasTossed = 0;
-  textEffects.count = 0;
-  printf("RESETTING\n");
-  begin = false;
-
-  game_phase = START_SCREEN;
-  start_time = 0;
-  phase_start_time = 0;
-
-  rotators[0] = (PizzaRotator){.rotation_speed = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}};
-  rotators[1] = (PizzaRotator){.rotation_speed = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}};
-  
-  scoreboardAnimationTime = 0;
-  pizzas = (Pizzas){0};
-
-  conveyor_belt = (ConveyorBelt){0};
-
-  orders = (Orders){0};
-
-  topping_selected = TOPPING_NONE;
-
-  max_active_orders = 1;
-  max_toppings_per_pizza = 2;
-
-  currentBeltFrame = 0;
-  beltTimer = 0;
-
-  ptrRotation = -117;
-  score = 0;
-  firstPizzaServed = false;
-
-  timerActive = false;
-  updateTimer = false;
-
-  conveyor_belt.speed = EARLY_PHASE_CONVEYOR_BELT_SPEED;
-
-  orderTickets[0].render_tex = LoadRenderTexture(blankOrderTicketTex.width, blankOrderTicketTex.height);
-  orderTickets[0].position = (Vector2){.x = 12, .y = 520};
-  orderTickets[1].render_tex = LoadRenderTexture(blankOrderTicketTex.width, blankOrderTicketTex.height);
-  orderTickets[1].position = (Vector2){.x = 1734, .y = 520};
-
-  
-  for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-    rotators[i].rotation_speed = PIZZA_BASE_ROTATION_SPEED;
-  }
-  rotators[0].position = (Vector2){
-    .x = 503,
-    .y = 795
-  };
-  rotators[1].position = (Vector2){
-    .x = 1415,
-    .y = 795
-  };
-
-  tutorialX = SCREEN_WIDTH - tutorialTex.width * 1.1;
-  
-  
-
-}
 
 int main()
 {
@@ -374,6 +298,150 @@ int main()
 
   InitAudioDevice();
 
+  LoadAssets();
+  
+#if defined(PLATFORM_WEB)
+	emscripten_set_main_loop(UpdateDrawFrame, 60, 1);
+#else
+	SetTargetFPS(FPS);
+
+	while (!WindowShouldClose())
+		UpdateDrawFrame();
+#endif
+
+  UnloadAssets();
+
+	CloseWindow();
+
+	return 0;
+}
+
+static void UpdateDrawFrame(void)
+{
+  float dt = GetFrameTime();
+  Vector2 mouse_pos = GetMousePosition();
+  double time = GetTime();
+  if (IsMouseButtonDown(0) && !musicPlaying) {
+      PlayMusicStream(retroMusic);
+      musicPlaying = true;
+
+  }
+  switch (game_phase) {
+    case START_SCREEN: {
+      if (begin) {
+        game_phase = TUTORIAL_PHASE;
+        phase_start_time = start_time;
+      }
+      
+    } break;
+    case TUTORIAL_PHASE: {
+      if (firstPizzaServed) {
+        game_phase = EARLY_PHASE;
+        start_time = time;
+        phase_start_time = time;
+        max_active_orders = 1;
+        conveyor_belt.speed = EARLY_PHASE_CONVEYOR_BELT_SPEED;
+      }
+    } break;
+    case EARLY_PHASE: {
+      if (time - phase_start_time >= EARLY_PHASE_TIME) {
+        game_phase = MIDDLE_PHASE;
+        max_active_orders = 2;
+        conveyor_belt.speed = MIDDLE_PHASE_CONVEYOR_BELT_SPEED;
+        phase_start_time = time;
+      }
+    } break;
+    case MIDDLE_PHASE: {
+      if (time  - phase_start_time >= MIDDLE_PHASE_TIME) {
+        game_phase = END_PHASE;
+        conveyor_belt.speed = END_PHASE_CONVEYOR_BELT_SPEED;
+        phase_start_time = time;
+      }
+    } break;
+    case END_PHASE: {
+      if (time - phase_start_time >= END_PHASE_TIME) {
+        game_phase = RESULTS_DISPLAY;
+        max_active_orders = 0;
+      }
+
+    } break;
+    case RESULTS_DISPLAY: {
+
+    } break;
+  }
+
+  if (!(game_phase == RESULTS_DISPLAY || game_phase == START_SCREEN)) {
+    UpdateOrders(time);
+
+    UpdateConveyorBelt();
+
+    // Rotate pizzas
+    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
+      if (rotators[i].active && rotators[i].spinning) {
+        pizzas.items[rotators[i].pizza_index].rotation += rotators[i].rotation_speed * pizzas.items[rotators[i].pizza_index].speedModifier * dt;
+      }
+    }
+
+    PickupToppingFromConveyorBelt(mouse_pos);
+
+    PlaceToppingOnPizza(mouse_pos);
+
+    TossOrServe(mouse_pos, time);
+
+    if (game_phase > TUTORIAL_PHASE && game_phase <= END_PHASE)
+      ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
+  }
+  
+  if (IsKeyPressed(KEY_R)) {
+    game_phase = RESULTS_DISPLAY;
+  }
+
+  UpdateMusicStream(retroMusic);
+
+	BeginDrawing(); {
+    ClearBackground(WHITE);
+    
+    DrawTexture(backgroundTex, 0, 0, WHITE);
+
+
+    DrawTexture(tossButtonImg, 105, 977, WHITE);
+    DrawTexture(serverButtonImg, 21, 977, WHITE);
+    DrawTexture(tossButtonImg, 1829, 977, WHITE);
+    DrawTexture(serverButtonImg, 1745, 977, WHITE);
+
+    DrawConveyorBelt(dt);
+
+    DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
+
+    int textSize = MeasureText(TextFormat("%d", score), 70);
+    DrawText(TextFormat("%d", score), SCREEN_WIDTH / 2 - textSize / 2, 619, 70, YELLOW);
+
+    if (game_phase != RESULTS_DISPLAY && game_phase != START_SCREEN) {
+      UpdateAndDrawSpeedControllers(mouse_pos);
+    }
+
+    DrawPizzas();
+
+    DrawOrderTicket();
+
+    DrawRobotArms();
+
+    DrawPickedUpTopping(mouse_pos);
+
+    DrawTextEffects();
+
+    DrawTutorial();
+
+    if (game_phase == RESULTS_DISPLAY) {
+      DrawEndScreen();
+    }
+    if (game_phase == START_SCREEN) {
+      DrawStartScreen();
+    }
+  } EndDrawing();
+}
+
+void LoadAssets(void) {
   tossPizza = LoadSound(ORDER_OUT_SFX);
   newPizza = LoadSound(ORDER_IN_SFX);
   placeIngredient = LoadSound(PLACE_INGREDIENT_SFX);
@@ -453,33 +521,153 @@ int main()
     .x = 1415,
     .y = 795
   };
+}
 
+void UnloadAssets(void) {
+  UnloadSound(tossPizza);
+  UnloadSound(newPizza);
+  UnloadSound(placeIngredient);
+  UnloadSound(changeKnob);
+
+  UnloadMusicStream(retroMusic);
   
-#if defined(PLATFORM_WEB)
-	emscripten_set_main_loop(UpdateDrawFrame, 60, 1);
-#else
-	SetTargetFPS(FPS);
+  UnloadTexture(startScreen);
 
-	while (!WindowShouldClose())
-		UpdateDrawFrame();
-#endif
+  UnloadFont(summer_font);
+  UnloadFont(cheese_font);
+  GenTextureMipmaps(&cheese_font.texture);
+  SetTextureFilter(cheese_font.texture, TEXTURE_FILTER_BILINEAR);
+
+  UnloadTexture(robotArmLeft);
+  UnloadTexture(robotArmRight);
+
+  UnloadTexture(leftArmHead);
+  UnloadTexture(leftArmRod);
+  UnloadTexture(leftArmBearing);
+
+  UnloadTexture(rightArmHead);
+  UnloadTexture(rightArmRod);
+  UnloadTexture(rightArmBearing);
+
+  UnloadTexture(backgroundTex);
+  UnloadTexture(speedControllerTex);
+  UnloadTexture(blankOrderTicketTex);
+
+  UnloadTexture(foregroundBelt);
+  UnloadTexture(conveyorBeltFrames[0]);
+  UnloadTexture(conveyorBeltFrames[1]);
+  UnloadTexture(conveyorBeltFrames[2]);
+
+  UnloadRenderTexture(orderTickets[0].render_tex);
+  UnloadRenderTexture(orderTickets[1].render_tex);
+
+  UnloadTexture(pizzaBaseTex);
+  UnloadTexture(pizzaMaskTex);
+
+  UnloadTexture(toppingsTex[TOPPING_MUSHROOM]);
+  UnloadTexture(toppingsTex[TOPPING_OLIVE]);
+  UnloadTexture(toppingsTex[TOPPING_PEPPERONI]);
+  UnloadTexture(toppingsTex[TOPPING_BELL_PEPPER]);
+  UnloadTexture(toppingsTex[TOPPING_CORN]);
+  UnloadTexture(toppingsTex[TOPPING_FETA]);
+  UnloadTexture(toppingsTex[TOPPING_SPINACH]);
+  UnloadTexture(toppingsTex[TOPPING_ONION]);
+
+  UnloadTexture(toppingPositionIconsTex[TOPPING_POSITION_FULL]);
+  UnloadTexture(toppingPositionIconsTex[TOPPING_POSITION_HALF1]);
+  UnloadTexture(toppingPositionIconsTex[TOPPING_POSITION_HALF2]);
+  UnloadTexture(toppingPositionIconsTex[TOPPING_POSITION_ALTERNATE1]);
+  UnloadTexture(toppingPositionIconsTex[TOPPING_POSITION_ALTERNATE2]);
+
+  UnloadTexture(tossButtonImg);
+  UnloadTexture(serverButtonImg);
+
+  UnloadTexture(gameTimePointer);
+  UnloadTexture(tutorialTex);
+  UnloadTexture(scoreboardTex);
 
   for (size_t i = 0; i < pizzas.count; i++) {
     if (!pizzas.items[i].delivered) UnloadRenderTexture(pizzas.items[i].render_tex);
   }
-  for (size_t i = 0; i < ARRAY_LEN(orderTickets); i++) {
-    UnloadRenderTexture(orderTickets[i].render_tex);
-  }
-  UnloadTexture(blankOrderTicketTex);
-  UnloadTexture(backgroundTex);
-  UnloadTexture(speedControllerTex);
-
-	CloseWindow();
-
-	return 0;
 }
-void DrawEndScreen() {
 
+void Reset() {
+  pizzasFinished = 0;
+  pizzasTossed = 0;
+  textEffects.count = 0;
+  printf("RESETTING\n");
+  begin = false;
+
+  game_phase = START_SCREEN;
+  start_time = 0;
+  phase_start_time = 0;
+
+  rotators[0] = (PizzaRotator){.rotation_speed = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}};
+  rotators[1] = (PizzaRotator){.rotation_speed = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}};
+  
+  scoreboardAnimationTime = 0;
+  pizzas = (Pizzas){0};
+
+  conveyor_belt = (ConveyorBelt){0};
+
+  orders = (Orders){0};
+
+  topping_selected = TOPPING_NONE;
+
+  max_active_orders = 1;
+  max_toppings_per_pizza = 2;
+
+  currentBeltFrame = 0;
+  beltTimer = 0;
+
+  ptrRotation = -117;
+  score = 0;
+  firstPizzaServed = false;
+
+  timerActive = false;
+
+  conveyor_belt.speed = EARLY_PHASE_CONVEYOR_BELT_SPEED;
+
+  orderTickets[0].render_tex = LoadRenderTexture(blankOrderTicketTex.width, blankOrderTicketTex.height);
+  orderTickets[0].position = (Vector2){.x = 12, .y = 520};
+  orderTickets[1].render_tex = LoadRenderTexture(blankOrderTicketTex.width, blankOrderTicketTex.height);
+  orderTickets[1].position = (Vector2){.x = 1734, .y = 520};
+
+  
+  for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
+    rotators[i].rotation_speed = PIZZA_BASE_ROTATION_SPEED;
+  }
+  rotators[0].position = (Vector2){
+    .x = 503,
+    .y = 795
+  };
+  rotators[1].position = (Vector2){
+    .x = 1415,
+    .y = 795
+  };
+
+  tutorialX = SCREEN_WIDTH - tutorialTex.width * 1.1;
+}
+
+float easeOutBounce(float x) {
+  const float n1 = 7.5625f;
+  const float d1 = 2.75f;
+
+  if (x < 1.0f / d1) {
+    return n1 * x * x;
+  } else if (x < 2.0f / d1) {
+    x -= 1.5f / d1;
+    return n1 * x * x + 0.75f;
+  } else if (x < 2.5f / d1) {
+    x -= 2.25f / d1;
+    return n1 * x * x + 0.9375f;
+  } else {
+    x -= 2.625f / d1;
+    return n1 * x * x + 0.984375f;
+  }
+}
+
+void DrawEndScreen(void) {
   scoreboardAnimationTime = min(1, scoreboardAnimationTime + 1 * GetFrameTime());
 
   int topY = (easeOutBounce(scoreboardAnimationTime) * (scoreboardTex.height + (SCREEN_HEIGHT - scoreboardTex.height) / 2.0f)) - scoreboardTex.height;
@@ -487,20 +675,24 @@ void DrawEndScreen() {
   DrawTexture(scoreboardTex, topX, topY, WHITE);
   
   
-  Vector2 finishedSize = MeasureTextEx(cheese_font, TextFormat("Pizzas Finished: %d", pizzasFinished), 40, 3);
-  Vector2 tossedSize = MeasureTextEx(cheese_font, TextFormat("Pizzas Tossed: %d", pizzasTossed), 40, 3);
-  Vector2 scoreSize = MeasureTextEx(cheese_font, TextFormat("Final Score: %d", score), 40, 3);
+  const char* pizzas_finished = TextFormat("Pizzas Finished: %d", pizzasFinished);
+  const char* pizzas_tossed = TextFormat("Pizzas Tossed: %d", pizzasTossed);
+  const char* final_score = TextFormat("Final Score: %d", score);
 
-  DrawTextEx(cheese_font, TextFormat("Pizzas Finished: %d", pizzasFinished), (Vector2){SCREEN_WIDTH / 2.0f - finishedSize.x / 2, topY + 200}, 40, 3, (Color){109, 61, 37, 255});
-  DrawTextEx(cheese_font, TextFormat("Pizzas Tossed: %d", pizzasTossed), (Vector2){SCREEN_WIDTH / 2.0f - tossedSize.x / 2, topY + 240}, 40, 3, (Color){109, 61, 37, 255});
-  DrawTextEx(cheese_font, TextFormat("Final Score: %d", score), (Vector2){SCREEN_WIDTH / 2.0f - scoreSize.x / 2, topY + 280}, 40, 3, (Color){109, 61, 37, 255});
+  Vector2 finishedSize = MeasureTextEx(cheese_font, pizzas_finished, 40, 3);
+  Vector2 tossedSize = MeasureTextEx(cheese_font, pizzas_tossed, 40, 3);
+  Vector2 scoreSize = MeasureTextEx(cheese_font, final_score, 40, 3);
+
+  DrawTextEx(cheese_font, pizzas_finished, (Vector2){SCREEN_WIDTH / 2.0f - finishedSize.x / 2, topY + 200}, 40, 3, (Color){109, 61, 37, 255});
+  DrawTextEx(cheese_font, pizzas_tossed, (Vector2){SCREEN_WIDTH / 2.0f - tossedSize.x / 2, topY + 240}, 40, 3, (Color){109, 61, 37, 255});
+  DrawTextEx(cheese_font, final_score, (Vector2){SCREEN_WIDTH / 2.0f - scoreSize.x / 2, topY + 280}, 40, 3, (Color){109, 61, 37, 255});
 
   int titleI = 0;
   if (score < 150) {
     titleI = 0;
   } else if (score < 350) {
     titleI = 1;
-  } else if (score < 5000) {
+  } else if (score < 500) {
     titleI = 2;
   }else if (score < 750) {
     titleI = 3;
@@ -526,167 +718,13 @@ void DrawEndScreen() {
   }
 }
 
-void DrawStartScreen() {
+void DrawStartScreen(void) {
   DrawTexture(startScreen, 0, 0, WHITE);
   if (IsMouseButtonPressed(0)) {
     begin = true;
   }
 }
-static void UpdateDrawFrame(void)
-{
-  float dt = GetFrameTime();
-  Vector2 mouse_pos = GetMousePosition();
-  double time = GetTime();
-  if (IsMouseButtonDown(0) && !musicPlaying) {
-      PlayMusicStream(retroMusic);
-      musicPlaying = true;
 
-  }
-  switch (game_phase) {
-    case START_SCREEN: {
-      if (begin) {
-        game_phase = TUTORIAL_PHASE;
-        updateTimer = false;
-        phase_start_time = start_time;
-      }
-      
-    } break;
-    case TUTORIAL_PHASE: {
-      if (firstPizzaServed) {
-        game_phase = EARLY_PHASE;
-        start_time = time;
-        phase_start_time = time;
-        updateTimer = true;
-        max_active_orders = 1;
-        conveyor_belt.speed = EARLY_PHASE_CONVEYOR_BELT_SPEED;
-      }
-    } break;
-    case EARLY_PHASE: {
-      if (time - phase_start_time >= EARLY_PHASE_TIME) {
-        game_phase = MIDDLE_PHASE;
-        max_active_orders = 2;
-        conveyor_belt.speed = MIDDLE_PHASE_CONVEYOR_BELT_SPEED;
-        phase_start_time = time;
-      }
-    } break;
-    case MIDDLE_PHASE: {
-      if (time  - phase_start_time >= MIDDLE_PHASE_TIME) {
-        game_phase = END_PHASE;
-        conveyor_belt.speed = END_PHASE_CONVEYOR_BELT_SPEED;
-        phase_start_time = time;
-      }
-    } break;
-    case END_PHASE: {
-      if (time - phase_start_time >= END_PHASE_TIME) {
-        game_phase = RESULTS_DISPLAY;
-        max_active_orders = 0;
-        updateTimer = false;
-      }
-
-    } break;
-    case RESULTS_DISPLAY: {
-
-    } break;
-  }
-
-  if (!(game_phase == RESULTS_DISPLAY || game_phase == START_SCREEN)) {
-    UpdateOrders(time);
-
-    UpdateConveyorBelt();
-
-    // Rotate pizzas
-    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-      if (rotators[i].active && rotators[i].spinning) {
-        pizzas.items[rotators[i].pizza_index].rotation += rotators[i].rotation_speed * pizzas.items[rotators[i].pizza_index].speedModifier * dt;
-      }
-    }
-
-    PickupToppingFromConveyorBelt(mouse_pos);
-
-    PlaceToppingOnPizza(mouse_pos);
-
-    bool wasFirstPizzaServed = firstPizzaServed;
-    TossOrServe(mouse_pos, time);
-    if (firstPizzaServed) {
-      if (!wasFirstPizzaServed) {start_time = time;}
-      ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
-    ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
-
-    }
-    UpdateOrders(time);
-
-    UpdateConveyorBelt();
-
-    // Rotate pizzas
-    for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
-      if (rotators[i].active && rotators[i].spinning) {
-        pizzas.items[rotators[i].pizza_index].rotation += rotators[i].rotation_speed * pizzas.items[rotators[i].pizza_index].speedModifier * dt;
-      }
-    }
-
-    PickupToppingFromConveyorBelt(mouse_pos);
-
-    PlaceToppingOnPizza(mouse_pos);
-
-    wasFirstPizzaServed = firstPizzaServed;
-    TossOrServe(mouse_pos, time);
-    if (firstPizzaServed) {
-      if (!wasFirstPizzaServed) {start_time = time;}
-      ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
-    ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
-
-    }
-  }
-  
-  // if (IsKeyPressed(KEY_R)) {
-  //   game_phase = RESULTS_DISPLAY;
-  // }
-  UpdateMusicStream(retroMusic);
-	BeginDrawing(); {
-    ClearBackground(WHITE);
-    
-    DrawTexture(backgroundTex, 0, 0, WHITE);
-
-
-    DrawTexture(tossButtonImg, 105, 977, WHITE);
-    DrawTexture(serverButtonImg, 21, 977, WHITE);
-    DrawTexture(tossButtonImg, 1829, 977, WHITE);
-    DrawTexture(serverButtonImg, 1745, 977, WHITE);
-
-    DrawConveyorBelt(dt);
-
-    DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
-
-    DrawText(TextFormat("%d", score), 852, 619, 70, YELLOW);
-
-    if (!(game_phase == RESULTS_DISPLAY || game_phase == START_SCREEN)) {
-    UpdateAndDrawSpeedControllers(mouse_pos);
-
-    }
-
-    DrawPizzas();
-
-    DrawOrderTicket();
-
-    DrawRobotArms();
-
-    DrawPickedUpTopping(mouse_pos);
-
-    DrawTextEffects();
-
-    DrawTutorial();
-
-    if (game_phase == RESULTS_DISPLAY) {
-      DrawEndScreen();
-    }
-    if (game_phase == START_SCREEN) {
-      DrawStartScreen();
-    }
-  } EndDrawing();
-
-  
-
-}
 
 size_t countSetBits(unsigned char n) {
   size_t bits = 0;
@@ -696,17 +734,25 @@ size_t countSetBits(unsigned char n) {
   return bits;
 }
 
-float CalculateAccuracy(size_t slices, ToppingPosition pos) {
-  if (slices == 6) {
-    return 1.00;
-  } else if (slices == 5) {
-    return 0.85f;
-  } else if (slices == 4) {
-    return 0.65f;
-  } else if (slices == 3) {
-    return 0.4f;
-  } else {
-    return 0;
+float CalculateAccuracy(size_t matched, ToppingPosition pos) {
+  switch (pos) {
+  case TOPPING_POSITION_FULL: {
+    if (matched == 6) return 1.0f;
+    if (matched == 5) return 0.85f;
+    if (matched == 4) return 0.65f;
+    if (matched == 3) return 0.40f;
+    return 0.0f;
+  } break;
+  case TOPPING_POSITION_HALF1:
+  case TOPPING_POSITION_HALF2:
+  case TOPPING_POSITION_ALTERNATE1:
+  case TOPPING_POSITION_ALTERNATE2: {
+    if (matched == 3) return 1.0f;
+    if (matched == 2) return 0.50f;
+    if (matched == 1) return 0.15f;
+    return 0.0f;
+  } break;
+  default: assert(false && "Other topping positions shouldn't be present when updating score");
   }
 }
 
@@ -752,8 +798,8 @@ void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
         for (size_t j = 0; j < ARRAY_LEN(half_slice_comparators); j++) {
           unsigned char expected = half_slice_comparators[j];
           unsigned char actual = toppings_present_on_slice[current_topping.type];
-          size_t correct = pizza.number_of_slices - countSetBits(expected ^ actual);
-          float acc = CalculateAccuracy(correct, current_topping.requested_position);
+          size_t matched = countSetBits(expected & actual);
+          float acc = CalculateAccuracy(matched, current_topping.requested_position);
           if (acc > best_acc) {
               best_acc = acc;
               matched_pattern = j;
@@ -807,10 +853,16 @@ void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
   pattern_accuracy = pattern_accuracy / order.requested_toppings.count;
   pizza_type_multiplier /= order.requested_toppings.count;
   float final_accuracy = fmax(0, pattern_accuracy - contanimation_penalty);
-  int scoreChange = BASE_SCORE * final_accuracy * pizza_type_multiplier * speed_multiplier;
-  score += scoreChange;
 
-  da_append(&textEffects, ((TextEffect){.text = TextFormat("%d", scoreChange), .opacity = 255, .position =(Vector2){852, 619 - 30}, .size = 60}));
+  int scoreChange = BASE_SCORE * final_accuracy * pizza_type_multiplier * speed_multiplier;
+  da_append(&textEffects, ((TextEffect){
+    .text = TextFormat("%d", score),
+    .opacity = 255, 
+    .position =(Vector2){852, 619 - 30},
+    .size = 60
+  }));
+
+  score += scoreChange;
 }
 
 void UpdateOrders(double time) {
@@ -1113,8 +1165,10 @@ void DrawConveyorBelt(float dt) {
   beltTimer += dt;
   if (beltTimer >= 1.0f/6.0f) {
     beltTimer = 0;
-    currentBeltFrame = (currentBeltFrame + 1) % 3;
+    if (game_phase >= TUTORIAL_PHASE && game_phase <= END_PHASE)
+      currentBeltFrame = (currentBeltFrame + 1) % 3;
   }
+
   DrawTexture(conveyorBeltFrames[currentBeltFrame], 0, 30, WHITE);
   for (size_t i = 0; i < conveyor_belt.count; i++) {
     Texture2D toppingTexture = toppingsTex[conveyor_belt.items[i].type];
@@ -1128,148 +1182,106 @@ void DrawConveyorBelt(float dt) {
 }
 
 void DrawRobotArms(void) {
-  {
-    Vector2 left_arm_attached_pos = {820,385};
-    Vector2 left_arm_attached_rod_pos = {820 - leftArmBearing.width*2.1, 385 - leftArmBearing.height/2.0f};
-    Vector2 left_arm_rotating_part_pos = {675, left_arm_attached_rod_pos.y + leftArmBearing.height/2.0f};
-    float left_arm_target_rot = 0;
+  Vector2 left_arm_attached_pos = {820,385};
+  Vector2 left_arm_attached_rod_pos = {820 - leftArmBearing.width*2.1, 385 - leftArmBearing.height/2.0f};
+  Vector2 left_arm_rotating_part_pos = {675, left_arm_attached_rod_pos.y + leftArmBearing.height/2.0f};
+  float left_arm_target_rot = 0;
+  if (game_phase >= TUTORIAL_PHASE && game_phase <= END_PHASE) {
     if (GetMouseX() <= left_arm_attached_pos.x) left_arm_target_rot = atan2f(left_arm_rotating_part_pos.y - GetMouseY(),  left_arm_rotating_part_pos.x - GetMouseX() ) * RAD2DEG;
-    //DrawText(TextFormat("%f",left_arm_target_rot),0,0,30,YELLOW);
     left_arm_target_rot = Clamp(left_arm_target_rot, -95, 95);
-    
-
-    
-
-    DrawTexturePro(
-      leftArmRod,
-      (Rectangle){
-        0,
-        0,
-        leftArmRod.width,
-        leftArmRod.height
-      },
-      (Rectangle){
-        left_arm_attached_rod_pos.x,
-        left_arm_attached_rod_pos.y,
-        leftArmRod.width*3,
-        leftArmRod.height
-      },
-      (Vector2){0, 0},
-      0,
-      WHITE
-    );
-    DrawTextureV(leftArmBearing, (Vector2){left_arm_attached_pos.x-leftArmBearing.width/2.0, left_arm_attached_pos.y-leftArmBearing.height/2.0}, WHITE);
-    DrawTexturePro(
-      robotArmLeft,
-      (Rectangle){
-        0, 
-        0,
-        robotArmLeft.width,
-        robotArmLeft.height
-      },
-      (Rectangle){
-        left_arm_rotating_part_pos.x,
-        left_arm_rotating_part_pos.y,
-        robotArmLeft.width,
-        robotArmLeft.height
-      },
-      (Vector2){
-        robotArmLeft.width - 40,
-        robotArmLeft.height/2.0,
-      },
-      left_arm_target_rot,
-      WHITE
-    );
-
-    Vector2 right_arm_attached_pos = {1099,385};
-    Vector2 right_arm_attached_rod_pos = {1099, 385 - rightArmBearing.height/2.0};
-    Vector2 right_arm_rotating_part_pos = {1244, right_arm_attached_rod_pos.y + rightArmBearing.height/2.0};
-    float right_arm_target_rot = 180;
-    if (GetMouseX() >= right_arm_attached_pos.x) right_arm_target_rot = atan2f(right_arm_rotating_part_pos.y - GetMouseY(),  right_arm_rotating_part_pos.x - GetMouseX() ) * RAD2DEG;
-    // DrawText(TextFormat("%f",right_arm_target_rot),0,0,30,YELLOW);
-    right_arm_target_rot = (int)right_arm_target_rot % 360;
-    right_arm_target_rot = (right_arm_target_rot >= 85) ? right_arm_target_rot : (right_arm_target_rot <= -85) ? right_arm_target_rot : -85;
-   
-    
-
-    DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_pos.x-rightArmBearing.width/2.0, right_arm_attached_pos.y-rightArmBearing.height/2.0}, WHITE);
-
-    DrawTexturePro(
-      rightArmRod,
-      (Rectangle){
-        0,
-        0,
-        rightArmRod.width,
-        rightArmRod.height
-      },
-      (Rectangle){
-        right_arm_attached_rod_pos.x,
-        right_arm_attached_rod_pos.y,
-        rightArmRod.width*3,
-        rightArmRod.height
-      },
-      (Vector2){0, 0},
-      0,
-      WHITE
-    );
-
-    DrawTexturePro(
-      robotArmLeft,
-      (Rectangle){
-        0, 
-        0,
-        robotArmRight.width,
-        robotArmRight.height
-      },
-      (Rectangle){
-        right_arm_rotating_part_pos.x,
-        right_arm_rotating_part_pos.y,
-        robotArmRight.width,
-        robotArmRight.height
-      },
-      (Vector2){
-        robotArmRight.width - 40,
-        robotArmRight.height/2.0,
-      },
-      right_arm_target_rot,
-      WHITE
-    );
-    
   }
-  {
-    Vector2 right_arm_attached_bearing_pos = {1090,385};
 
-    // float right_arm_target_rot = 0;
-    // if (mouse_pos.x >= right_arm_pos.x) right_arm_target_rot = atan2f( mouse_pos.y - right_arm_pos.y ,   mouse_pos.x - right_arm_pos.x  ) * RAD2DEG;
-    //    // DrawText(TextFormat("%f",right_arm_angle),0,0,30,YELLOW);
-    //
-    // right_arm_target_rot = Clamp(right_arm_target_rot, -90, 90);
-    // if (fabsf(right_arm_target_rot - rightArmAngle) > 45) {
-    //       rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.1);
-    // } else if (right_arm_target_rot != 0) {
-    //     rightArmAngle = right_arm_target_rot;
-    // } else {
-    //   rightArmAngle = Lerp(rightArmAngle, right_arm_target_rot, 0.05);
-    // }
-    //
-    // float distToCursor = Vector2Length(Vector2Subtract(right_arm_pos, mouse_pos));
-    // RenderTexture2D rightArmRenderTex = LoadRenderTexture(distToCursor + 84, 114);
-    // if (distToCursor > 297 && mouse_pos.x >= right_arm_pos.x) {
-    //   BeginTextureMode(rightArmRenderTex);
-    //   int endOfRod = distToCursor + 84 - 168;
-    //   DrawTexture(rightArmHead, endOfRod, 0, WHITE);
-    //   DrawTexturePro(rightArmRod, (Rectangle){0,0,153,114}, (Rectangle){79, 0, endOfRod - 79, 114}, (Vector2){0,0}, 0, WHITE);
-    //   DrawTexture(rightArmBearing, 0, 0, WHITE);
-    //   EndTextureMode();
-    //   robotArmRight = rightArmRenderTex.texture;
-    // }
+  DrawTexturePro(
+    leftArmRod,
+    (Rectangle){
+      0,
+      0,
+      leftArmRod.width,
+      leftArmRod.height
+    },
+    (Rectangle){
+      left_arm_attached_rod_pos.x,
+      left_arm_attached_rod_pos.y,
+      leftArmRod.width*3,
+      leftArmRod.height
+    },
+    (Vector2){0, 0},
+    0,
+    WHITE
+  );
+  DrawTextureV(leftArmBearing, (Vector2){left_arm_attached_pos.x-leftArmBearing.width/2.0, left_arm_attached_pos.y-leftArmBearing.height/2.0}, WHITE);
+  DrawTexturePro(
+    robotArmLeft,
+    (Rectangle){
+      0, 
+      0,
+      robotArmLeft.width,
+      robotArmLeft.height
+    },
+    (Rectangle){
+      left_arm_rotating_part_pos.x,
+      left_arm_rotating_part_pos.y,
+      robotArmLeft.width,
+      robotArmLeft.height
+    },
+    (Vector2){
+      robotArmLeft.width - 40,
+      robotArmLeft.height/2.0,
+    },
+    left_arm_target_rot,
+    WHITE
+  );
 
-    // DrawTexturePro( robotArmRight, (Rectangle){0, 0, robotArmRight.width, robotArmRight.height},
-    //   (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
-    //   (Vector2){ 40, robotArmRight.height / 2.0f}, 
-    //   rightArmAngle , WHITE);
-    DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_bearing_pos.x-rightArmBearing.width/2.0f, right_arm_attached_bearing_pos.y-rightArmBearing.height/2.0f}, WHITE);
-  }
+  Vector2 right_arm_attached_pos = {1099,385};
+  Vector2 right_arm_attached_rod_pos = {1099, 385 - rightArmBearing.height/2.0};
+  Vector2 right_arm_rotating_part_pos = {1244, right_arm_attached_rod_pos.y + rightArmBearing.height/2.0};
+  float right_arm_target_rot = 180;
+  if (GetMouseX() >= right_arm_attached_pos.x) right_arm_target_rot = atan2f(right_arm_rotating_part_pos.y - GetMouseY(),  right_arm_rotating_part_pos.x - GetMouseX() ) * RAD2DEG;
+  right_arm_target_rot = (int)right_arm_target_rot % 360;
+  right_arm_target_rot = (right_arm_target_rot >= 85) ? right_arm_target_rot : (right_arm_target_rot <= -85) ? right_arm_target_rot : -85;
+
+  DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_pos.x-rightArmBearing.width/2.0, right_arm_attached_pos.y-rightArmBearing.height/2.0}, WHITE);
+
+  DrawTexturePro(
+    rightArmRod,
+    (Rectangle){
+      0,
+      0,
+      rightArmRod.width,
+      rightArmRod.height
+    },
+    (Rectangle){
+      right_arm_attached_rod_pos.x,
+      right_arm_attached_rod_pos.y,
+      rightArmRod.width*3,
+      rightArmRod.height
+    },
+    (Vector2){0, 0},
+    0,
+    WHITE
+  );
+
+  DrawTexturePro(
+    robotArmLeft,
+    (Rectangle){
+      0, 
+      0,
+      robotArmRight.width,
+      robotArmRight.height
+    },
+    (Rectangle){
+      right_arm_rotating_part_pos.x,
+      right_arm_rotating_part_pos.y,
+      robotArmRight.width,
+      robotArmRight.height
+    },
+    (Vector2){
+      robotArmRight.width - 40,
+      robotArmRight.height/2.0,
+    },
+    right_arm_target_rot,
+    WHITE
+  );
 }
 
 void UpdateAndDrawSpeedControllers(Vector2 mouse_pos) {
@@ -1286,11 +1298,11 @@ void UpdateAndDrawSpeedControllers(Vector2 mouse_pos) {
 
   bool openToDrag = topping_selected == TOPPING_NONE && IsMouseButtonDown(MOUSE_BUTTON_LEFT);
   
-  if (CheckCollisionPointRec(mouse_pos, (Rectangle){826.0f, (float)leftY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl && pizzas.items[0].toppings.count < 1) {
+  if (CheckCollisionPointRec(mouse_pos, (Rectangle){826.0f, (float)leftY, 69.0f, 38.0f}) && openToDrag && !draggingLeftCtrl && pizzas.items[rotators[0].pizza_index].toppings.count < 1) {
     draggingLeftCtrl = true;
   }
 
-  if (CheckCollisionPointRec(mouse_pos, (Rectangle){1018.0f, (float)rightY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl && pizzas.items[1].toppings.count < 1) {
+  if (CheckCollisionPointRec(mouse_pos, (Rectangle){1018.0f, (float)rightY, 69.0f, 38.0f}) && openToDrag && !draggingRightCtrl && pizzas.items[rotators[1].pizza_index].toppings.count < 1) {
     draggingRightCtrl = true;
   }
 
@@ -1484,10 +1496,6 @@ void DrawTextEffects(void) {
 }
 
 void DrawTutorial(void) {
-  if (!firstPizzaServed) {
+  if (!firstPizzaServed)
     DrawTexture(tutorialTex, tutorialX, (SCREEN_HEIGHT - tutorialTex.height) / 2, WHITE);
-  } else if (tutorialX < SCREEN_WIDTH) {
-    tutorialX += 15;
-    DrawTexture(tutorialTex, tutorialX, (SCREEN_HEIGHT - tutorialTex.height) / 2, WHITE);
-  }
 }
