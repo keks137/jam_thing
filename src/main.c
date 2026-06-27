@@ -27,8 +27,6 @@
 #define TOTAL_GAME_TIME 360
 #define FPS 60
 
-
-
 typedef enum {
   START_SCREEN,
   TUTORIAL_PHASE,
@@ -101,6 +99,7 @@ typedef size_t PizzaIndex;
 
 typedef struct {
   float rotation_speed;
+  size_t speed_setting;
   bool active;
   size_t order_index;
   bool spinning;
@@ -162,14 +161,15 @@ typedef struct {
 
 TextEffects textEffects = {0};
 
+#define BASE_SCORE 50
 
 GamePhase game_phase = START_SCREEN;
 float start_time = 0;
 float phase_start_time = 0;
 
 PizzaRotator rotators[2] = {
-  {.rotation_speed = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}},
-  {.rotation_speed = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}},
+  {.rotation_speed = 0, .speed_setting = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}},
+  {.rotation_speed = 0, .speed_setting = 0, .active = false, .order_index = 0, .pizza_index = 0, .position = {0}},
 };
 
 Pizzas pizzas = {0};
@@ -240,7 +240,7 @@ bool timerActive = false;
 bool updateTimer = false;
 
 static void UpdateDrawFrame(void);
-void UpdateScore(Pizza pizza, Order order);
+void UpdateScore(Pizza pizza, Order order, size_t speed_setting);
 void UpdateOrders(double time);
 void UpdateConveyorBelt(void);
 void PickupToppingFromConveyorBelt(Vector2 mouse_pos);
@@ -359,20 +359,19 @@ static void UpdateDrawFrame(void)
 
   switch (game_phase) {
     case START_SCREEN: {
-      game_phase = EARLY_PHASE;
-      updateTimer = true;
-      start_time = time;
+      game_phase = TUTORIAL_PHASE;
       phase_start_time = start_time;
     } break;
     case TUTORIAL_PHASE: {
       if (firstPizzaServed) {
         game_phase = EARLY_PHASE;
-        game_phase_time = time;
+        start_time = time;
+        phase_start_time = time;
+        updateTimer = true;
         max_active_orders = 1;
         conveyor_belt.speed = EARLY_PHASE_CONVEYOR_BELT_SPEED;
       }
-      
-    }
+    } break;
     case EARLY_PHASE: {
       if (time - phase_start_time >= EARLY_PHASE_TIME) {
         game_phase = MIDDLE_PHASE;
@@ -401,8 +400,7 @@ static void UpdateDrawFrame(void)
     } break;
   }
 
-  if (updateTimer)
-    ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
+  if (updateTimer) ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
 
   UpdateOrders(time);
 
@@ -461,13 +459,29 @@ static void UpdateDrawFrame(void)
   } EndDrawing();
 }
 
-void UpdateScore(Pizza pizza, Order order) {
-  int startScore = score;
-  if (score > 6) {
-    score -= 6;
-  } else {
-    score = 0;
+size_t countSetBits(unsigned char n) {
+  size_t bits = 0;
+  for (size_t i = 1; i < (1 << 8); i = i << 1) {
+    if ((i & n) != 0) bits += 1;
   }
+  return bits;
+}
+
+float CalculateAccuracy(size_t slices, ToppingPosition pos) {
+  if (slices == 6) {
+    return 1.00;
+  } else if (slices == 5) {
+    return 0.85f;
+  } else if (slices == 4) {
+    return 0.65f;
+  } else if (slices == 3) {
+    return 0.4f;
+  } else {
+    return 0;
+  }
+}
+
+void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
   unsigned char toppings_present_on_slice[__topping_type_count];
   for (size_t i = 0; i < __topping_type_count; i++) {
     toppings_present_on_slice[i] = 0;
@@ -480,8 +494,13 @@ void UpdateScore(Pizza pizza, Order order) {
     toppings_present_on_slice[pizza.toppings.items[i].type] |= 1 << slice;
   }
 
+  unsigned char full_comparator = 0b00111111;
   unsigned char half_slice_comparators[] = {0b00111000, 0b00011100, 0b00001110, 0b00000111, 0b00100011, 0b00110001};
   unsigned char alternate_slice_comparators[] = {0b00101010, 0b00010101};
+
+  float pattern_accuracy = 0.0;
+  float contanimation_penalty = 0.0;
+  float pizza_type_multiplier = 0;
 
   for (size_t i = 0; i < order.requested_toppings.count; i++) {
     Topping current_topping = order.requested_toppings.items[i];
@@ -489,224 +508,78 @@ void UpdateScore(Pizza pizza, Order order) {
     switch (current_topping.requested_position) {
       case TOPPING_POSITION_NONE: assert(false && "topping position in order should not be none");
       case TOPPING_POSITION_FULL: {
-        for (unsigned char j = 1; j < (1 << pizza.number_of_slices); j = j << 1) {
-          if ((toppings_present_on_slice[current_topping.type] & j) != 0) {
-            score += 1;
-          }
-        }
+        pizza_type_multiplier += 1.0f;
+
+        float acc = CalculateAccuracy(countSetBits(full_comparator & toppings_present_on_slice[current_topping.type]), current_topping.requested_position);
+        pattern_accuracy += acc;
       } break;
-      case TOPPING_POSITION_HALF1: {
-        // check other topping which is requested
-        size_t other_order = i == 0 ? 1 : 0;
-        if (order.requested_toppings.items[other_order].requested_position == TOPPING_POSITION_HALF2) {
-          if ((toppings_present_on_slice[current_topping.type] & toppings_present_on_slice[order.requested_toppings.items[other_order].type]) == 0) {
-            bool perfect_half = false;
-            for (size_t j = 0; j < ARRAY_LEN(half_slice_comparators); j++) {
-              if ((half_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == half_slice_comparators[j]) {
-                perfect_half = true;
-                break;
-              }
-            }
-            if (perfect_half) {
-              score += pizza.number_of_slices / 2;
-              score += 2;
-            } else {
-              // TODO: what is score if the half isn't perfect, that is there are less than half the slices with the topping or they are not continuos
-              score += 1;
-            }
-          } else {
-            bool perfect_half = false;
-            for (size_t j = 0; j < ARRAY_LEN(half_slice_comparators); j++) {
-              if ((half_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == half_slice_comparators[j]) {
-                perfect_half = true;
-                break;
-              }
-            }
-            if (perfect_half) {
-              // TODO: what is score if half is perfect but intersecting with other topping which is half2
-              score += pizza.number_of_slices / 2 - 1;
-              score += 1;
-            } else {
-              // TODO: what is score if the half isn't perfect, that is there are less than half the slices with the topping or they are not continuos and it's intersecting with half2
-              score += 1;
-            }
-          }
-        } else {
-            bool perfect_half = false;
-            for (size_t j = 0; j < ARRAY_LEN(half_slice_comparators); j++) {
-              if ((half_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == half_slice_comparators[j]) {
-                perfect_half = true;
-                break;
-              }
-            }
-            if (perfect_half) {
-              score += pizza.number_of_slices;
-              score += 1;
-            } else {
-              // TODO: what is score if the half isn't perfect, that is there are less than half the slices with the topping or they are not continuos
-            }
-        }
-      } break;
+      case TOPPING_POSITION_HALF1: 
       case TOPPING_POSITION_HALF2: {
-        // check other topping which is requested
-        size_t other_order = i == 0 ? 1 : 0;
-        if (order.requested_toppings.items[other_order].requested_position == TOPPING_POSITION_HALF1) {
-          if ((toppings_present_on_slice[current_topping.type] & toppings_present_on_slice[order.requested_toppings.items[other_order].type]) == 0) {
-            bool perfect_half = false;
-            for (size_t j = 0; j < ARRAY_LEN(half_slice_comparators); j++) {
-              if ((half_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == half_slice_comparators[j]) {
-                perfect_half = true;
-                break;
-              }
-            }
-            if (perfect_half) {
-              score += pizza.number_of_slices / 2;
-              score += 2;
-            } else {
-              // TODO: what is score if the half isn't perfect, that is there are less than half the slices with the topping or they are not continuos
-              score += 1;
-            }
-          } else {
-            bool perfect_half = false;
-            for (size_t j = 0; j < ARRAY_LEN(half_slice_comparators); j++) {
-              if ((half_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == half_slice_comparators[j]) {
-                perfect_half = true;
-                break;
-              }
-            }
-            if (perfect_half) {
-              // TODO: what is score if half is perfect but intersecting with other topping which is half2
-              score += pizza.number_of_slices / 2 - 1;
-              score += 1;
-            } else {
-              // TODO: what is score if the half isn't perfect, that is there are less than half the slices with the topping or they are not continuos and it's intersecting with half2
-              score += 1;
-            }
+        pizza_type_multiplier += 1.5f;
+
+        size_t matched_pattern = 0;
+        float best_acc = 0;
+        for (size_t j = 0; j < ARRAY_LEN(half_slice_comparators); j++) {
+          unsigned char expected = half_slice_comparators[j];
+          unsigned char actual = toppings_present_on_slice[current_topping.type];
+          size_t correct = pizza.number_of_slices - countSetBits(expected ^ actual);
+          float acc = CalculateAccuracy(correct, current_topping.requested_position);
+          if (acc > best_acc) {
+              best_acc = acc;
+              matched_pattern = j;
           }
-        } else {
-            bool perfect_half = false;
-            for (size_t j = 0; j < ARRAY_LEN(half_slice_comparators); j++) {
-              if ((half_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == half_slice_comparators[j]) {
-                perfect_half = true;
-                break;
-              }
-            }
-            if (perfect_half) {
-              score += pizza.number_of_slices / 2;
-              score += 1;
-            } else {
-              // TODO: what is score if the half isn't perfect, that is there are less than half the slices with the topping or they are not continuos
-            }
+        }
+        pattern_accuracy += best_acc;
+        size_t other_topping = i == 0 ? 1 : 0;
+        if (i < other_topping && order.requested_toppings.items[other_topping].requested_position != TOPPING_POSITION_FULL) {
+          size_t contanimated_slices = countSetBits(half_slice_comparators[matched_pattern] & toppings_present_on_slice[order.requested_toppings.items[other_topping].type]);
+          contanimation_penalty += contanimated_slices * 0.1f;
         }
       } break;
 
-      case TOPPING_POSITION_ALTERNATE1: {
-        size_t other_order = i == 0 ? 1 : 0;
-        if (order.requested_toppings.items[other_order].requested_position == TOPPING_POSITION_ALTERNATE2) {
-          if ((toppings_present_on_slice[current_topping.type] & toppings_present_on_slice[order.requested_toppings.items[other_order].type]) == 0) {
-            bool perfect_alternating = false;
-            for (size_t j = 0; j < ARRAY_LEN(alternate_slice_comparators); j++) {
-              if ((alternate_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == alternate_slice_comparators[j]) {
-                perfect_alternating = true;
-                break;
-              }
-            }
-            if (perfect_alternating) {
-              score += pizza.number_of_slices / 2;
-              score += 2;
-            } else {
-              // TODO: what is score if alternating slices are not perfect
-              score += 1;
-            }
-          } else {
-            bool perfect_alternating = false;
-            for (size_t j = 0; j < ARRAY_LEN(alternate_slice_comparators); j++) {
-              if ((alternate_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == alternate_slice_comparators[j]) {
-                perfect_alternating = true;
-                break;
-              }
-            }
-            if (perfect_alternating) {
-              // TODO: what is score if alternating slices are perfect but it's intersecting with other alternate toppings
-              score += pizza.number_of_slices / 2 - 1;
-              score += 1;
-            } else {
-              // TODO: what is score if alternating slices are not perfect and it's intersecting with other alternate toppings
-              score += 1;
-            }
-          }
-        } else {
-            bool perfect_alternating = false;
-            for (size_t j = 0; j < ARRAY_LEN(alternate_slice_comparators); j++) {
-              if ((alternate_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == alternate_slice_comparators[j]) {
-                perfect_alternating = true;
-                break;
-              }
-            }
-            if (perfect_alternating) {
-              score += pizza.number_of_slices / 2;
-              score += 1;
-            } else {
-              // TODO: what is score if alternating slices are not perfect
-            }
-        }
-      } break;
+      case TOPPING_POSITION_ALTERNATE1: 
       case TOPPING_POSITION_ALTERNATE2: {
-        size_t other_order = i == 0 ? 1 : 0;
-        if (order.requested_toppings.items[other_order].requested_position == TOPPING_POSITION_ALTERNATE1) {
-          if ((toppings_present_on_slice[current_topping.type] & toppings_present_on_slice[order.requested_toppings.items[other_order].type]) == 0) {
-            bool perfect_alternating = false;
-            for (size_t j = 0; j < ARRAY_LEN(alternate_slice_comparators); j++) {
-              if ((alternate_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == alternate_slice_comparators[j]) {
-                perfect_alternating = true;
-                break;
-              }
-            }
-            if (perfect_alternating) {
-              score += pizza.number_of_slices / 2;
-              score += 2;
-            } else {
-              // TODO: what is score if alternating slices are not perfect
-              score += 1;
-            }
-          } else {
-            bool perfect_alternating = false;
-            for (size_t j = 0; j < ARRAY_LEN(alternate_slice_comparators); j++) {
-              if ((alternate_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == alternate_slice_comparators[j]) {
-                perfect_alternating = true;
-                break;
-              }
-            }
-            if (perfect_alternating) {
-              // TODO: what is score if alternating slices are perfect but it's intersecting with other alternate toppings
-              score += pizza.number_of_slices / 2 - 1;
-              score += 1;
-            } else {
-              // TODO: what is score if alternating slices are not perfect and it's intersecting with other alternate toppings
-              score += 1;
-            }
+        pizza_type_multiplier += 2.0f;
+
+        size_t matched_pattern = 0;
+        float best_acc = 0;
+        for (size_t j = 0; j < ARRAY_LEN(alternate_slice_comparators); j++) {
+          unsigned char expected = alternate_slice_comparators[j];
+          unsigned char actual = toppings_present_on_slice[current_topping.type];
+          size_t correct = pizza.number_of_slices - countSetBits(expected ^ actual);
+          float acc = CalculateAccuracy(correct, current_topping.requested_position);
+          if (acc > best_acc) {
+              best_acc = acc;
+              matched_pattern = j;
           }
-        } else {
-            bool perfect_alternating = false;
-            for (size_t j = 0; j < ARRAY_LEN(alternate_slice_comparators); j++) {
-              if ((alternate_slice_comparators[j] & toppings_present_on_slice[current_topping.type]) == alternate_slice_comparators[j]) {
-                perfect_alternating = true;
-                break;
-              }
-            }
-            if (perfect_alternating) {
-              score += pizza.number_of_slices / 2;
-              score += 1;
-            } else {
-              // TODO: what is score if alternating slices are not perfect
-            }
+        }
+        pattern_accuracy += best_acc;
+        size_t other_topping = i == 0 ? 1 : 0;
+        if (i < other_topping && order.requested_toppings.items[other_topping].requested_position != TOPPING_POSITION_FULL) {
+          size_t contanimated_slices = countSetBits(alternate_slice_comparators[matched_pattern] & toppings_present_on_slice[order.requested_toppings.items[other_topping].type]);
+          contanimation_penalty += contanimated_slices * 0.1f;
         }
       } break;
       default: assert(false && "Topping position is unkown in order");
     }
   }
 
-  int scoreChange = score - startScore;
+  float speed_multiplier = 0;
+  switch (speed_setting) {
+    case 0: speed_multiplier = 1.0f; break;
+    case 1: speed_multiplier = 1.25f; break;
+    case 2: speed_multiplier = 1.75f; break;
+    case 3: speed_multiplier = 2.0f; break;
+    default: assert(false && "unkown speed setting");
+  }
+
+  pattern_accuracy = fmin(pattern_accuracy, 1.0f);
+  pizza_type_multiplier /= order.requested_toppings.count;
+  float final_accuracy = fmax(0, pattern_accuracy - contanimation_penalty);
+  int scoreChange = BASE_SCORE * final_accuracy * pizza_type_multiplier * speed_multiplier;
+  printf("pattern_accuracy = %f, contanimation_penalty = %f, final_accuracy = %f, pizza_type_multiplier %f, speed_multiplier = %f, score = %d", pattern_accuracy, contanimation_penalty, final_accuracy, pizza_type_multiplier, speed_multiplier, scoreChange);
+  score += scoreChange;
+
   da_append(&textEffects, ((TextEffect){.text = "", .opacity = 255, .position =(Vector2){852, 619 - 30}, .size = 60}));
   snprintf(textEffects.items[textEffects.count - 1].text, sizeof(textEffects.items[textEffects.count - 1].text), "%d", scoreChange);
 }
@@ -729,62 +602,117 @@ void UpdateOrders(double time) {
     da_append(&available_toppings, ((Topping){.type = TOPPING_FETA}));
     da_append(&available_toppings, ((Topping){.type = TOPPING_SPINACH}));
 
-    for (size_t i = 0; i < max_toppings_per_pizza; i++) {
-      int prob = rand() % 1000 + 1;
-      Topping topping = {0};
-      switch (game_phase) {
-        case TUTORIAL_PHASE: {
+    int prob = rand() % 1000 + 1;
+    Topping topping = {0};
+    switch (game_phase) {
+      case TUTORIAL_PHASE: {
+        if (prob < 500) {
+          topping.requested_position = TOPPING_POSITION_FULL;
+        } else {
+          topping.requested_position = TOPPING_POSITION_HALF1;
+        }
+      }
+      case EARLY_PHASE: {
+        if (prob < 500) {
+          topping.requested_position = TOPPING_POSITION_FULL;
+        } else {
+          topping.requested_position = TOPPING_POSITION_HALF1;
+        }
+      } break;
+      case MIDDLE_PHASE: {
+        if (prob < 200) {
+          topping.requested_position = TOPPING_POSITION_FULL;
+        } else if (prob < 700) {
+          topping.requested_position = TOPPING_POSITION_HALF1;
+        } else {
+          topping.requested_position = TOPPING_POSITION_ALTERNATE1;
+        }
+      } break;
+      case END_PHASE: {
+        if (prob < 200) {
+          topping.requested_position = TOPPING_POSITION_FULL;
+        } else if (prob < 600) {
+          topping.requested_position = TOPPING_POSITION_HALF1;
+        } else {
+          topping.requested_position = TOPPING_POSITION_ALTERNATE1;
+        }
+      } break;
+      default:
+        assert(false && "shouldn't add orders in this state");
+    }
+
+    size_t available_toppings_index = rand() % available_toppings.count;
+    topping.type = available_toppings.items[available_toppings_index].type;
+    da_remove_unordered(&available_toppings, available_toppings_index);
+
+
+    da_append(&order.requested_toppings, topping);
+
+    prob = rand() % 1000 + 1;
+    Topping topping2 = {0};
+    switch (game_phase) {
+      case TUTORIAL_PHASE: {
+        if (topping.requested_position == TOPPING_POSITION_HALF1) {
+          topping2.requested_position = TOPPING_POSITION_HALF2;
+        } else {
           if (prob < 500) {
-            topping.requested_position = TOPPING_POSITION_FULL;
+            topping2.requested_position = TOPPING_POSITION_FULL;
           } else {
-            topping.requested_position = TOPPING_POSITION_HALF1;
+            topping2.requested_position = TOPPING_POSITION_HALF1;
           }
         }
-        case EARLY_PHASE: {
-          if (prob < 500) {
-            topping.requested_position = TOPPING_POSITION_FULL;
-          } else if (prob < 750) {
-            topping.requested_position = TOPPING_POSITION_HALF1;
-          } else {
-            topping.requested_position = TOPPING_POSITION_HALF2;
-          }
-        } break;
-        case MIDDLE_PHASE: {
-          if (prob < 200) {
-            topping.requested_position = TOPPING_POSITION_FULL;
-          } else if (prob < 550) {
-            topping.requested_position = TOPPING_POSITION_HALF1;
-          } else if (prob < 700) {
-            topping.requested_position = TOPPING_POSITION_HALF2;
-          } else if (prob < 850) {
-            topping.requested_position = TOPPING_POSITION_ALTERNATE1;
-          } else {
-            topping.requested_position = TOPPING_POSITION_ALTERNATE2;
-          }
-        } break;
-        case END_PHASE: {
-          if (prob < 200) {
-            topping.requested_position = TOPPING_POSITION_FULL;
-          } else if (prob < 400) {
-            topping.requested_position = TOPPING_POSITION_HALF1;
-          } else if (prob < 600) {
-            topping.requested_position = TOPPING_POSITION_HALF2;
-          } else if (prob < 800) {
-            topping.requested_position = TOPPING_POSITION_ALTERNATE1;
-          } else {
-            topping.requested_position = TOPPING_POSITION_ALTERNATE2;
-          }
-        } break;
-        default:
-          assert(false && "shouldn't add orders in this state");
       }
-
-      size_t available_toppings_index = rand() % available_toppings.count;
-      topping.type = available_toppings.items[available_toppings_index].type;
-      da_remove_unordered(&available_toppings, available_toppings_index);
-
-      da_append(&order.requested_toppings, topping);
+      case EARLY_PHASE: {
+        if (topping.requested_position == TOPPING_POSITION_HALF1) {
+          topping2.requested_position = TOPPING_POSITION_HALF2;
+        } else {
+          if (prob < 500) {
+            topping2.requested_position = TOPPING_POSITION_FULL;
+          } else {
+            topping2.requested_position = TOPPING_POSITION_HALF1;
+          }
+        }
+      } break;
+      case MIDDLE_PHASE: {
+        if (topping.requested_position == TOPPING_POSITION_HALF1) {
+          topping2.requested_position = TOPPING_POSITION_HALF2;
+        } else if (topping.requested_position == TOPPING_POSITION_ALTERNATE1) {
+          topping2.requested_position = TOPPING_POSITION_ALTERNATE2;
+        } else {
+          if (prob < 200) {
+            topping2.requested_position = TOPPING_POSITION_FULL;
+          } else if (prob < 700) {
+            topping2.requested_position = TOPPING_POSITION_HALF1;
+          } else {
+            topping2.requested_position = TOPPING_POSITION_ALTERNATE1;
+          }
+        }
+      } break;
+      case END_PHASE: {
+        if (topping.requested_position == TOPPING_POSITION_HALF1) {
+          topping2.requested_position = TOPPING_POSITION_HALF2;
+        } else if (topping.requested_position == TOPPING_POSITION_ALTERNATE1) {
+          topping2.requested_position = TOPPING_POSITION_ALTERNATE2;
+        } else {
+          if (prob < 200) {
+            topping2.requested_position = TOPPING_POSITION_FULL;
+          } else if (prob < 600) {
+            topping2.requested_position = TOPPING_POSITION_HALF1;
+          } else {
+            topping2.requested_position = TOPPING_POSITION_ALTERNATE1;
+          }
+        }
+      } break;
+      default:
+        assert(false && "shouldn't add orders in this state");
     }
+
+    available_toppings_index = rand() % available_toppings.count;
+    topping2.type = available_toppings.items[available_toppings_index].type;
+    da_remove_unordered(&available_toppings, available_toppings_index);
+
+    da_append(&order.requested_toppings, topping2);
+
     da_free(available_toppings);
 
     for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
@@ -803,7 +731,7 @@ void UpdateOrders(double time) {
         .render_tex = LoadRenderTexture(PIZZA_RADIUS*2, PIZZA_RADIUS*2),
         .toppings = {0}, 
         .delivered = false,
-        .speedModifier = 1 + (GetRandomValue(0, 30) / 10)
+        .speedModifier = 1 + (GetRandomValue(0, 20) / 100.0f)
       }));
       break;
     }
@@ -824,7 +752,7 @@ void UpdateConveyorBelt(void) {
   if (
     orders.active > 0 &&
     (conveyor_belt.count == 0 
-    || da_last(&conveyor_belt).position.x + toppingsTex[da_last(&conveyor_belt).type].width/2 > CONVEYOR_BELT_INGREDIENT_GAP)
+    || da_last(&conveyor_belt).position.x + toppingsTex[da_last(&conveyor_belt).type].width/2.0f > CONVEYOR_BELT_INGREDIENT_GAP)
   ) {
     Toppings required_toppings = {0};
     for (size_t i = 0; i < ARRAY_LEN(rotators); i++) {
@@ -836,7 +764,7 @@ void UpdateConveyorBelt(void) {
     int required_toppings_index = rand() % required_toppings.count;
     da_append(&conveyor_belt, ((ConveyorBeltIngredient){
       .type = required_toppings.items[required_toppings_index].type,
-      .position = {.x = 0, .y = 120 - toppingsTex[required_toppings.items[required_toppings_index].type].height/2 * INGREDIENT_SCALE},
+      .position = {.x = 0, .y = 120 - toppingsTex[required_toppings.items[required_toppings_index].type].height/2.0f * INGREDIENT_SCALE},
     }));
 
     da_free(required_toppings);
@@ -925,7 +853,7 @@ void TossOrServe(Vector2 mouse_pos, double time) {
       orders.items[rotators[0].order_index].deliver_time = time;
       orders.active -= 1;
       pizzas.items[rotators[0].pizza_index].delivered = true;
-      UpdateScore(pizzas.items[rotators[0].pizza_index], orders.items[rotators[0].order_index]);
+      UpdateScore(pizzas.items[rotators[0].pizza_index], orders.items[rotators[0].order_index], rotators[0].speed_setting);
     }
   }
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, rightServeButton)) {
@@ -937,7 +865,7 @@ void TossOrServe(Vector2 mouse_pos, double time) {
       orders.items[rotators[1].order_index].deliver_time = time;
       orders.active -= 1;
       pizzas.items[rotators[1].pizza_index].delivered = true;
-      UpdateScore(pizzas.items[rotators[1].pizza_index], orders.items[rotators[1].order_index]);
+      UpdateScore(pizzas.items[rotators[1].pizza_index], orders.items[rotators[1].order_index], rotators[1].speed_setting);
     }
   }
 }
@@ -963,8 +891,8 @@ void DrawConveyorBelt(float dt) {
 void DrawRobotArms(void) {
   {
     Vector2 left_arm_attached_pos = {820,385};
-    Vector2 left_arm_attached_rod_pos = {820 - leftArmBearing.width*2.1, 385 - leftArmBearing.height/2};
-    Vector2 left_arm_rotating_part_pos = {675, left_arm_attached_rod_pos.y + leftArmBearing.height/2};
+    Vector2 left_arm_attached_rod_pos = {820 - leftArmBearing.width*2.1, 385 - leftArmBearing.height/2.0f};
+    Vector2 left_arm_rotating_part_pos = {675, left_arm_attached_rod_pos.y + leftArmBearing.height/2.0f};
     float left_arm_target_rot = 0;
     if (GetMouseX() <= left_arm_attached_pos.x) left_arm_target_rot = atan2f(left_arm_rotating_part_pos.y - GetMouseY(),  left_arm_rotating_part_pos.x - GetMouseX() ) * RAD2DEG;
     DrawText(TextFormat("%f",left_arm_target_rot),0,0,30,YELLOW);
@@ -989,7 +917,7 @@ void DrawRobotArms(void) {
     //   robotArmLeft = leftArmRenderTex.texture;
     // }
 
-    DrawTextureV(leftArmBearing, (Vector2){left_arm_attached_pos.x-leftArmBearing.width/2, left_arm_attached_pos.y-leftArmBearing.height/2}, WHITE);
+    DrawTextureV(leftArmBearing, (Vector2){left_arm_attached_pos.x-leftArmBearing.width/2.0, left_arm_attached_pos.y-leftArmBearing.height/2.0f}, WHITE);
 
     DrawTexturePro(
       leftArmRod,
@@ -1026,7 +954,7 @@ void DrawRobotArms(void) {
       },
       (Vector2){
         robotArmLeft.width - 40,
-        robotArmLeft.height/2,
+        robotArmLeft.height/2.0,
       },
       left_arm_target_rot,
       WHITE
@@ -1068,7 +996,7 @@ void DrawRobotArms(void) {
     //   (Rectangle){right_arm_pos.x, right_arm_pos.y, robotArmRight.width, robotArmRight.height},
     //   (Vector2){ 40, robotArmRight.height / 2.0f}, 
     //   rightArmAngle , WHITE);
-    DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_bearing_pos.x-rightArmBearing.width/2, right_arm_attached_bearing_pos.y-rightArmBearing.height/2}, WHITE);
+    DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_bearing_pos.x-rightArmBearing.width/2.0f, right_arm_attached_bearing_pos.y-rightArmBearing.height/2.0f}, WHITE);
   }
 }
 
@@ -1099,6 +1027,7 @@ void UpdateAndDrawSpeedControllers(Vector2 mouse_pos) {
       rotators[0].rotation_speed = ((float)(1.0f - ((mouse_pos.y - 19 * 4) - (float)topY) / (float)(bottomY - topY) * (maxSpeed - minSpeed)) + minSpeed);
       rotators[0].rotation_speed = minSpeed + maxSpeed * (round(((rotators[0].rotation_speed - minSpeed) / maxSpeed) * 4) / 4);
       rotators[0].rotation_speed = (((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) < maxSpeed) ? ((rotators[0].rotation_speed > minSpeed) ? rotators[0].rotation_speed : minSpeed) : maxSpeed;
+      rotators[0].speed_setting = (rotators[0].rotation_speed / minSpeed) - 1;
 
       if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
         draggingLeftCtrl = false;
