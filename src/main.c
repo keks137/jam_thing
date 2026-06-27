@@ -152,7 +152,7 @@ typedef struct {
 } ConveyorBelt;
 
 typedef struct {
-  const char* text;
+  char text[64];
   Vector2 position;
   int size;
   int opacity;
@@ -392,9 +392,9 @@ static void UpdateDrawFrame(void)
       ptrRotation = (((time - start_time) / (float)TOTAL_GAME_TIME) * (113 - -117)) - 117;
   }
   
-  if (IsKeyPressed(KEY_R)) {
-    game_phase = RESULTS_DISPLAY;
-  }
+  // if (IsKeyPressed(KEY_R)) {
+  //   game_phase = RESULTS_DISPLAY;
+  // }
 
   UpdateMusicStream(retroMusic);
 
@@ -413,8 +413,9 @@ static void UpdateDrawFrame(void)
 
     DrawTexturePro(gameTimePointer, (Rectangle){0,0,27,95},(Rectangle){960, 148, 27, 95}, (Vector2){13, 80}, ptrRotation, WHITE);
 
-    int textSize = MeasureText(TextFormat("%d", score), 70);
-    DrawText(TextFormat("%d", score), SCREEN_WIDTH / 2 - textSize / 2, 619, 70, YELLOW);
+    const char* score_str = TextFormat("%d", score);
+    int textSize = MeasureText(score_str, 70);
+    DrawText(score_str, SCREEN_WIDTH / 2 - textSize / 2, 619, 70, YELLOW);
 
     if (game_phase != RESULTS_DISPLAY && game_phase != START_SCREEN) {
       UpdateAndDrawSpeedControllers(mouse_pos);
@@ -595,7 +596,6 @@ void Reset() {
   pizzasFinished = 0;
   pizzasTossed = 0;
   textEffects.count = 0;
-  printf("RESETTING\n");
   begin = false;
 
   game_phase = START_SCREEN;
@@ -855,12 +855,13 @@ void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
   float final_accuracy = fmax(0, pattern_accuracy - contanimation_penalty);
 
   int scoreChange = BASE_SCORE * final_accuracy * pizza_type_multiplier * speed_multiplier;
-  da_append(&textEffects, ((TextEffect){
-    .text = TextFormat("%d", score),
+  TextEffect effect = {
     .opacity = 255, 
     .position =(Vector2){852, 619 - 30},
     .size = 60
-  }));
+  };
+  snprintf(effect.text, sizeof(effect.text), "%zu", score);
+  da_append(&textEffects, effect);
 
   score += scoreChange;
 }
@@ -1132,6 +1133,7 @@ void TossOrServe(Vector2 mouse_pos, double time) {
   }
   
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mouse_pos, leftServeButton)) {
+    printf("pressed\n");
     if (rotators[0].active) {
       pizzasFinished++;
       PlaySound(newPizza);
