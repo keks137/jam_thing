@@ -24,7 +24,7 @@
 #define EARLY_PHASE_TIME 40
 #define MIDDLE_PHASE_TIME 120
 #define END_PHASE_TIME 160
-#define TOTAL_GAME_TIME 360
+#define TOTAL_GAME_TIME 320
 #define FPS 60
 
 #define min(a,b) (((a) < (b)) ? (a) : (b))
@@ -1268,8 +1268,6 @@ void DrawRobotArms(void) {
   right_arm_target_rot = (int)right_arm_target_rot % 360;
   right_arm_target_rot = (right_arm_target_rot >= 85) ? right_arm_target_rot : (right_arm_target_rot <= -85) ? right_arm_target_rot : -85;
 
-  DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_pos.x-rightArmBearing.width/2.0, right_arm_attached_pos.y-rightArmBearing.height/2.0}, WHITE);
-
   DrawTexturePro(
     rightArmRod,
     (Rectangle){
@@ -1288,6 +1286,8 @@ void DrawRobotArms(void) {
     0,
     WHITE
   );
+
+  DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_pos.x-rightArmBearing.width/2.0, right_arm_attached_pos.y-rightArmBearing.height/2.0}, WHITE);
 
   DrawTexturePro(
     robotArmLeft,
