@@ -46,8 +46,10 @@
 #define RIGHT_CLAW_BEARING_IMG ASSETS_DIR "right-claw-bearing.png"
 
 #define TUTORIAL_IMG ASSETS_DIR "tutorial.png"
+#define SCORE_BOARD_IMG ASSETS_DIR "score-board.png"
 
 #define SUMMER_FONT ASSETS_DIR "Summer-4nx3W.ttf"
+#define CHEESE_FONT ASSETS_DIR "FreeCheese-dryYR.ttf"
 
 #endif // ASSETS_H_
 
