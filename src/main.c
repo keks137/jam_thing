@@ -1044,11 +1044,38 @@ void UpdateConveyorBelt(void) {
         da_append(&required_toppings, ((Topping){.type = orders.items[rotators[i].order_index].requested_toppings.items[j].type}));
       }
     }
-    int required_toppings_index = rand() % required_toppings.count;
-    da_append(&conveyor_belt, ((ConveyorBeltIngredient){
-      .type = required_toppings.items[required_toppings_index].type,
-      .position = {.x = 0, .y = 120 - toppingsTex[required_toppings.items[required_toppings_index].type].height/2.0f * INGREDIENT_SCALE},
-    }));
+
+    int random_toppings_prob = 0;
+    switch (game_phase) {
+      case EARLY_PHASE: random_toppings_prob = 8; break;
+      case MIDDLE_PHASE: random_toppings_prob = 12; break;
+      case END_PHASE: random_toppings_prob = 15; break;
+      default: break;
+    }
+    if (rand() % 100 + 1 <= random_toppings_prob) {
+      Toppings random_toppings = {0};
+      for (int i = TOPPING_NONE + 1; i < __topping_type_count; i++) {
+        bool present = false;
+        for (size_t j = 0; j < required_toppings.count; j++) {
+          if (required_toppings.items[j].type == i) {
+            present = true;
+            break;
+          }
+        }
+        if (!present) da_append(&random_toppings, ((Topping){.type = i}));
+      }
+      int random_toppings_index = rand() % random_toppings.count;
+      da_append(&conveyor_belt, ((ConveyorBeltIngredient){
+        .type = random_toppings.items[random_toppings_index].type,
+        .position = {.x = 0, .y = 120 - toppingsTex[random_toppings.items[random_toppings_index].type].height/2.0f * INGREDIENT_SCALE},
+      }));
+    } else {
+      int required_toppings_index = rand() % required_toppings.count;
+      da_append(&conveyor_belt, ((ConveyorBeltIngredient){
+        .type = required_toppings.items[required_toppings_index].type,
+        .position = {.x = 0, .y = 120 - toppingsTex[required_toppings.items[required_toppings_index].type].height/2.0f * INGREDIENT_SCALE},
+      }));
+    }
 
     da_free(required_toppings);
   }
