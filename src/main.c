@@ -1342,6 +1342,7 @@ void UpdateAndDrawSpeedControllers(Vector2 mouse_pos) {
       rotators[0].speed_setting = (rotators[0].rotation_speed / minSpeed) - 1;
 
       if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        PlaySound(changeKnob);
         draggingLeftCtrl = false;
       }
     }
@@ -1355,6 +1356,7 @@ void UpdateAndDrawSpeedControllers(Vector2 mouse_pos) {
 
       
       if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        PlaySound(changeKnob);
         draggingRightCtrl = false;
       }
     }
