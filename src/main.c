@@ -894,7 +894,7 @@ void UpdateOrders(double time) {
         } else {
           topping.requested_position = TOPPING_POSITION_HALF1;
         }
-      }
+      } break;
       case EARLY_PHASE: {
         if (prob < 500) {
           topping.requested_position = TOPPING_POSITION_FULL;
@@ -944,7 +944,7 @@ void UpdateOrders(double time) {
             topping2.requested_position = TOPPING_POSITION_HALF1;
           }
         }
-      }
+      } break;
       case EARLY_PHASE: {
         if (topping.requested_position == TOPPING_POSITION_HALF1) {
           topping2.requested_position = TOPPING_POSITION_HALF2;
@@ -1054,7 +1054,7 @@ void UpdateConveyorBelt(void) {
     }
     if (rand() % 100 + 1 <= random_toppings_prob) {
       Toppings random_toppings = {0};
-      for (int i = TOPPING_NONE + 1; i < __topping_type_count; i++) {
+      for (ToppingType i = TOPPING_NONE + 1; i < __topping_type_count; i++) {
         bool present = false;
         for (size_t j = 0; j < required_toppings.count; j++) {
           if (required_toppings.items[j].type == i) {
