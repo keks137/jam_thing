@@ -1,0 +1,11 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\src",
+    "\\vendor",
+    "\\vendor\\raylib",
+    "\\vendor\\raylib\\src"
+  ],
+  "SelectedNode": "\\vendor\\raylib\\src\\CMakeLists.txt",
+  "PreviewInSolutionExplorer": false
+}
