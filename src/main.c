@@ -901,7 +901,7 @@ void UpdateOrders(double time) {
         } else {
           topping.requested_position = TOPPING_POSITION_HALF1;
         }
-      }
+      } break;
       case EARLY_PHASE: {
         if (prob < 500) {
           topping.requested_position = TOPPING_POSITION_FULL;
@@ -951,7 +951,7 @@ void UpdateOrders(double time) {
             topping2.requested_position = TOPPING_POSITION_HALF1;
           }
         }
-      }
+      } break;
       case EARLY_PHASE: {
         if (topping.requested_position == TOPPING_POSITION_HALF1) {
           topping2.requested_position = TOPPING_POSITION_HALF2;
@@ -1066,7 +1066,7 @@ void UpdateConveyorBelt(void) {
     }
     if (rand() % 100 + 1 <= random_toppings_prob) {
       Toppings random_toppings = {0};
-      for (int i = TOPPING_NONE + 1; i < __topping_type_count; i++) {
+      for (ToppingType i = TOPPING_NONE + 1; i < __topping_type_count; i++) {
         bool present = false;
         for (size_t j = 0; j < required_toppings.count; j++) {
           if (required_toppings.items[j].type == i) {
@@ -1280,8 +1280,6 @@ void DrawRobotArms(void) {
   right_arm_target_rot = (int)right_arm_target_rot % 360;
   right_arm_target_rot = (right_arm_target_rot >= 85) ? right_arm_target_rot : (right_arm_target_rot <= -85) ? right_arm_target_rot : -85;
 
-  DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_pos.x-rightArmBearing.width/2.0, right_arm_attached_pos.y-rightArmBearing.height/2.0}, WHITE);
-
   DrawTexturePro(
     rightArmRod,
     (Rectangle){
@@ -1300,6 +1298,8 @@ void DrawRobotArms(void) {
     0,
     WHITE
   );
+
+  DrawTextureV(rightArmBearing, (Vector2){right_arm_attached_pos.x-rightArmBearing.width/2.0, right_arm_attached_pos.y-rightArmBearing.height/2.0}, WHITE);
 
   DrawTexturePro(
     robotArmLeft,
@@ -1354,6 +1354,7 @@ void UpdateAndDrawSpeedControllers(Vector2 mouse_pos) {
       rotators[0].speed_setting = (rotators[0].rotation_speed / minSpeed) - 1;
 
       if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        PlaySound(changeKnob);
         draggingLeftCtrl = false;
       }
     }
@@ -1367,6 +1368,7 @@ void UpdateAndDrawSpeedControllers(Vector2 mouse_pos) {
 
       
       if (!IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        PlaySound(changeKnob);
         draggingRightCtrl = false;
       }
     }
