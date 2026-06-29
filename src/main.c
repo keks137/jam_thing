@@ -269,6 +269,9 @@ char* titles[6] = {
 bool musicPlaying = false;
 bool begin = false;
 
+float leftTicketTimeline;
+float rightTicketTimeline;
+
 static void UpdateDrawFrame(void);
 void LoadAssets(void);
 void UnloadAssets(void);
@@ -598,6 +601,9 @@ void Reset() {
   textEffects.count = 0;
   begin = false;
 
+  leftTicketTimeline = 0;
+  rightTicketTimeline = 0;
+
   game_phase = START_SCREEN;
   start_time = 0;
   phase_start_time = 0;
@@ -855,6 +861,7 @@ void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
   float final_accuracy = fmax(0, pattern_accuracy - contanimation_penalty);
 
   int scoreChange = BASE_SCORE * final_accuracy * pizza_type_multiplier * speed_multiplier;
+  printf("%f, %f, %f", final_accuracy, pizza_type_multiplier, speed_multiplier);
   TextEffect effect = {
     .opacity = 255, 
     .position =(Vector2){SCREEN_WIDTH/2.0, 619 - 30},
@@ -1016,6 +1023,11 @@ void UpdateOrders(double time) {
         .delivered = false,
         .speedModifier = 1 + (GetRandomValue(0, 20) / 100.0f)
       }));
+      if (i == 0) {
+        leftTicketTimeline = 0;
+      } else {
+        rightTicketTimeline = 0;
+      }
       break;
     }
     da_append(&orders, order);
@@ -1434,7 +1446,17 @@ void DrawPizzas(void) {
 }
 
 void DrawOrderTicket(void) {
+
+  leftTicketTimeline = min(1.0f, leftTicketTimeline + 0.01);
+  rightTicketTimeline = min(1.0f, rightTicketTimeline + 0.01);
+
+
+
   for (size_t i = 0; i < ARRAY_LEN(orderTickets); i++) {
+    float progress = easeOutBounce(rightTicketTimeline);
+    if (i == 0) {
+      progress = easeOutBounce(leftTicketTimeline);
+    }
     BeginTextureMode(orderTickets[i].render_tex); {
       DrawTexture(blankOrderTicketTex, 0, 0, WHITE);
       if (rotators[i].active) {
@@ -1492,7 +1514,7 @@ void DrawOrderTicket(void) {
       },
       (Rectangle){
         orderTickets[i].position.x,
-        orderTickets[i].position.y,
+        (orderTickets[i].position.y + orderTickets[i].render_tex.texture.height) * progress - orderTickets[i].render_tex.texture.height,
         orderTickets[i].render_tex.texture.width,
         orderTickets[i].render_tex.texture.height
       },
