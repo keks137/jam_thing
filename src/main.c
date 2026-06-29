@@ -271,6 +271,7 @@ bool begin = false;
 
 float leftTicketTimeline;
 float rightTicketTimeline;
+float delay_between_orders = 0;
 
 static void UpdateDrawFrame(void);
 void LoadAssets(void);
@@ -285,7 +286,7 @@ void DrawConveyorBelt(float dt);
 void DrawRobotArms(void);
 void UpdateAndDrawSpeedControllers(Vector2 mouse_pos);
 void DrawPizzas(void);
-void DrawOrderTicket(void);
+void DrawOrderTicket(double time);
 void DrawPickedUpTopping(Vector2 mouse_pos);
 void DrawTextEffects(void);
 void DrawTutorial(void);
@@ -334,6 +335,7 @@ static void UpdateDrawFrame(void)
       if (begin) {
         game_phase = TUTORIAL_PHASE;
         phase_start_time = start_time;
+        delay_between_orders = 0;
       }
       
     } break;
@@ -342,6 +344,7 @@ static void UpdateDrawFrame(void)
         game_phase = EARLY_PHASE;
         start_time = time;
         phase_start_time = time;
+        delay_between_orders = 1.0;
         max_active_orders = 1;
         conveyor_belt.speed = EARLY_PHASE_CONVEYOR_BELT_SPEED;
       }
@@ -350,6 +353,8 @@ static void UpdateDrawFrame(void)
       if (time - phase_start_time >= EARLY_PHASE_TIME) {
         game_phase = MIDDLE_PHASE;
         max_active_orders = 2;
+        // BUG: changing delay time, can cause the order ticket to stop in middle of screen
+        delay_between_orders = 1.0;
         conveyor_belt.speed = MIDDLE_PHASE_CONVEYOR_BELT_SPEED;
         phase_start_time = time;
       }
@@ -426,7 +431,7 @@ static void UpdateDrawFrame(void)
 
     DrawPizzas();
 
-    DrawOrderTicket();
+    DrawOrderTicket(time);
 
     DrawRobotArms();
 
@@ -1445,23 +1450,26 @@ void DrawPizzas(void) {
   }
 }
 
-void DrawOrderTicket(void) {
-
-  leftTicketTimeline = min(1.0f, leftTicketTimeline + 0.01);
-  rightTicketTimeline = min(1.0f, rightTicketTimeline + 0.01);
-
-
-
+void DrawOrderTicket(double time) {
   for (size_t i = 0; i < ARRAY_LEN(orderTickets); i++) {
-    float progress = easeOutBounce(rightTicketTimeline);
+    size_t order_index = rotators[i].order_index;
+    Order order = orders.items[order_index];
+
+    if (i == 0 && rotators[i].active && time > orders.items[rotators[i].order_index].order_time + delay_between_orders)
+      leftTicketTimeline = fmin(1.0f, leftTicketTimeline + 0.01);
+    if (i == 1 && rotators[i].active && time > orders.items[rotators[i].order_index].order_time + delay_between_orders)
+      rightTicketTimeline = fmin(1.0f, rightTicketTimeline + 0.01);
+
+    float progress;
     if (i == 0) {
       progress = easeOutBounce(leftTicketTimeline);
+    } else if (i == 1) {
+      progress = easeOutBounce(rightTicketTimeline);
     }
+
     BeginTextureMode(orderTickets[i].render_tex); {
       DrawTexture(blankOrderTicketTex, 0, 0, WHITE);
       if (rotators[i].active) {
-        size_t order_index = rotators[i].order_index;
-        Order order = orders.items[order_index];
         Vector2 position = {20, 150};
         for (size_t j = 0; j < order.requested_toppings.count; j++) {
           Topping topping = order.requested_toppings.items[j];
