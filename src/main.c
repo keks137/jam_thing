@@ -1522,7 +1522,7 @@ void DrawOrderTicket(double time) {
       },
       (Rectangle){
         orderTickets[i].position.x,
-        (orderTickets[i].position.y + orderTickets[i].render_tex.texture.height) * progress - orderTickets[i].render_tex.texture.height,
+        SCREEN_HEIGHT - 40 - ((orderTickets[i].position.y + orderTickets[i].render_tex.texture.height) * progress - orderTickets[i].render_tex.texture.height),
         orderTickets[i].render_tex.texture.width,
         orderTickets[i].render_tex.texture.height
       },
