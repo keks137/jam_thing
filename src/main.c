@@ -30,7 +30,6 @@
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 
 
-
 typedef enum {
   START_SCREEN,
   TUTORIAL_PHASE,
@@ -79,7 +78,7 @@ typedef struct {
 } Toppings;
 
 #define PIZZA_RADIUS 236
-#define PIZZA_BASE_ROTATION_SPEED 31.415 * (PI / 180)
+#define PIZZA_BASE_ROTATION_SPEED 31.415 * (PI / 180) * 2
 
 typedef struct {
   size_t number_of_slices;
@@ -865,14 +864,13 @@ void UpdateScore(Pizza pizza, Order order, size_t speed_setting) {
   pizza_type_multiplier /= order.requested_toppings.count;
   float final_accuracy = fmax(0, pattern_accuracy - contanimation_penalty);
 
-  int scoreChange = BASE_SCORE * final_accuracy * pizza_type_multiplier * speed_multiplier;
-  printf("%f, %f, %f", final_accuracy, pizza_type_multiplier, speed_multiplier);
+  size_t scoreChange = BASE_SCORE * final_accuracy * pizza_type_multiplier * speed_multiplier;
   TextEffect effect = {
     .opacity = 255, 
     .position =(Vector2){SCREEN_WIDTH/2.0, 619 - 30},
     .size = 60
   };
-  snprintf(effect.text, sizeof(effect.text), "%zu", score);
+  snprintf(effect.text, sizeof(effect.text), "+%zu", scoreChange);
   da_append(&textEffects, effect);
 
   score += scoreChange;
@@ -1332,7 +1330,7 @@ void DrawRobotArms(void) {
 void UpdateAndDrawSpeedControllers(Vector2 mouse_pos) {
   int topY =  840;
   int bottomY = 1010;
-  float minSpeed = 31.415 * (PI / 180);
+  float minSpeed = PIZZA_BASE_ROTATION_SPEED;
   float maxSpeed = minSpeed * 4;
 
   int leftY = topY + (1.0f - (rotators[0].rotation_speed - minSpeed) / (maxSpeed - minSpeed)) * (bottomY - topY);
